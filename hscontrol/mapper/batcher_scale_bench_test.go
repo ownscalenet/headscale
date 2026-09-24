@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types/change"
 	"tailscale.com/tailcfg"
 )
 

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/go-json-experiment/json"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/util"
 	"github.com/tailscale/hujson"
 	"go4.org/netipx"
 	"tailscale.com/net/tsaddr"
@@ -91,7 +91,7 @@ var (
 	ErrNodeAttrsIPPoolOutOfRange    = errors.New("nodeAttrs ipPool must be within 100.64.0.0/10")
 	ErrNodeAttrsAutogroupNotAllowed = errors.New("nodeAttrs target does not support this autogroup")
 	ErrNodeAttrUnsupported          = errors.New("nodeAttrs uses a feature headscale does not yet support")
-	ErrNodeAttrIPPoolUnsupported    = errors.New("nodeAttrs ipPool requires the IP allocator (https://github.com/juanfont/headscale/issues/2912)")
+	ErrNodeAttrIPPoolUnsupported    = errors.New("nodeAttrs ipPool requires the IP allocator (https://github.com/ownscalenet/headscale/issues/2912)")
 	ErrNodeAttrTargetUnsupported    = errors.New("nodeAttrs target alias type is not supported")
 )
 
@@ -102,7 +102,7 @@ var (
 // would advertise a feature that does not work. Reject at policy load and
 // point operators at the issue.
 var nodeAttrUnsupportedCaps = map[nodecap.Cap]string{
-	nodecap.Funnel: "https://github.com/juanfont/headscale/issues/2527",
+	nodecap.Funnel: "https://github.com/ownscalenet/headscale/issues/2527",
 }
 
 // Policy validation errors.

@@ -185,7 +185,7 @@ func TestMatchFromFilterRule(t *testing.T) {
 			// Regression: cap-grant-only rules (e.g. cap/relay)
 			// carry their destinations in CapGrant.Dsts. The
 			// matcher must surface those for peer-visibility
-			// derivation. https://github.com/juanfont/headscale/issues/3256
+			// derivation. https://github.com/ownscalenet/headscale/issues/3256
 			name: "CapGrant Dsts populate destination set",
 			rule: tailcfg.FilterRule{
 				SrcIPs: []string{"100.64.0.1/32", "100.64.0.2/32"},

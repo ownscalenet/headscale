@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/ownscalenet/headscale/hscontrol/policy/matcher"
+	"github.com/ownscalenet/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"go4.org/netipx"
 	"tailscale.com/net/tsaddr"

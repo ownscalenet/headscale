@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 )
 
 // TestNodeStoreWriteDuringStopNoPanic ensures a write racing with Stop does not

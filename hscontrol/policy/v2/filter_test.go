@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/hscontrol/policy/policyutil"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/netipx"
@@ -2241,7 +2241,7 @@ func TestSSHWithAutogroupSelfAndMixedDestinations(t *testing.T) {
 
 // TestAutogroupSelfWithNonExistentUserInGroup verifies that when a group
 // contains a non-existent user, partial resolution still works correctly.
-// This reproduces the issue from https://github.com/juanfont/headscale/issues/2990
+// This reproduces the issue from https://github.com/ownscalenet/headscale/issues/2990
 // where autogroup:self breaks when groups contain users that don't have
 // registered nodes.
 func TestAutogroupSelfWithNonExistentUserInGroup(t *testing.T) {

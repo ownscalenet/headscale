@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/tailscale/squibble"

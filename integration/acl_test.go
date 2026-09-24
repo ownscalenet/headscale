@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	policyv2 "github.com/ownscalenet/headscale/hscontrol/policy/v2"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/integration/hsic"
+	"github.com/ownscalenet/headscale/integration/integrationutil"
+	"github.com/ownscalenet/headscale/integration/tsic"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -334,7 +334,7 @@ func TestACLHostsInNetMapTable(t *testing.T) {
 // This should make the node appear in the peer list, but
 // disallow ping.
 // This ACL will not allow user1 access its own machines.
-// Reported: https://github.com/juanfont/headscale/issues/699
+// Reported: https://github.com/ownscalenet/headscale/issues/699
 func TestACLAllowUser80Dst(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -441,7 +441,7 @@ func TestACLDenyAllPort80(t *testing.T) {
 
 // Test to confirm that we can use user:* from one user.
 // This ACL will not allow user1 access its own machines.
-// Reported: https://github.com/juanfont/headscale/issues/699
+// Reported: https://github.com/ownscalenet/headscale/issues/699
 func TestACLAllowUserDst(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -500,7 +500,7 @@ func TestACLAllowUserDst(t *testing.T) {
 }
 
 // Test to confirm that we can use *:* from one user
-// Reported: https://github.com/juanfont/headscale/issues/699
+// Reported: https://github.com/ownscalenet/headscale/issues/699
 func TestACLAllowStarDst(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -626,7 +626,7 @@ func TestACLNamedHostsCanReachBySubnet(t *testing.T) {
 
 // This test aims to cover cases where individual hosts are allowed and denied
 // access based on their assigned hostname
-// https://github.com/juanfont/headscale/issues/941
+// https://github.com/ownscalenet/headscale/issues/941
 //
 //	ACL = [{
 //			"DstPorts": [{
@@ -660,9 +660,9 @@ func TestACLNamedHostsCanReachBySubnet(t *testing.T) {
 //		}
 //	}
 //
-// https://github.com/juanfont/headscale/issues/941
+// https://github.com/ownscalenet/headscale/issues/941
 // Additionally verify ipv6 behaviour, part of
-// https://github.com/juanfont/headscale/issues/809
+// https://github.com/ownscalenet/headscale/issues/809
 func TestACLNamedHostsCanReach(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -2875,7 +2875,7 @@ func TestACLGroupWithUnknownUser(t *testing.T) {
 	// non-existent user (e.g., "nonexistent@"), the valid users in
 	// the group should still be able to connect to each other.
 	//
-	// Issue: https://github.com/juanfont/headscale/issues/2967
+	// Issue: https://github.com/ownscalenet/headscale/issues/2967
 
 	spec := ScenarioSpec{
 		NodesPerUser: 1,
@@ -2973,7 +2973,7 @@ func TestACLGroupAfterUserDeletion(t *testing.T) {
 	// their reference remains in an ACL group, the remaining valid users
 	// in the group should still be able to connect to each other.
 	//
-	// Issue: https://github.com/juanfont/headscale/issues/2967
+	// Issue: https://github.com/ownscalenet/headscale/issues/2967
 
 	spec := ScenarioSpec{
 		NodesPerUser: 1,
@@ -3148,7 +3148,7 @@ func TestACLGroupAfterUserDeletion(t *testing.T) {
 func TestACLGroupDeletionExactReproduction(t *testing.T) {
 	IntegrationSkip(t)
 
-	// Issue: https://github.com/juanfont/headscale/issues/2967
+	// Issue: https://github.com/ownscalenet/headscale/issues/2967
 
 	const userToDelete = "user2"
 
@@ -3320,7 +3320,7 @@ func TestACLGroupDeletionExactReproduction(t *testing.T) {
 func TestACLDynamicUnknownUserAddition(t *testing.T) {
 	IntegrationSkip(t)
 
-	// Issue: https://github.com/juanfont/headscale/issues/2967
+	// Issue: https://github.com/ownscalenet/headscale/issues/2967
 	// Comment: "Pinging still stops when a non-registered user is added to a group"
 
 	spec := ScenarioSpec{
@@ -3467,7 +3467,7 @@ func TestACLDynamicUnknownUserAddition(t *testing.T) {
 func TestACLDynamicUnknownUserRemoval(t *testing.T) {
 	IntegrationSkip(t)
 
-	// Issue: https://github.com/juanfont/headscale/issues/2967
+	// Issue: https://github.com/ownscalenet/headscale/issues/2967
 	// Comment: "Removing all invalid users from ACL restores connectivity"
 
 	spec := ScenarioSpec{

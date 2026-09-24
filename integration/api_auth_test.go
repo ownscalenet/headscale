@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	"github.com/ownscalenet/headscale/integration/hsic"
+	"github.com/ownscalenet/headscale/integration/integrationutil"
+	"github.com/ownscalenet/headscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,8 +22,8 @@ import (
 // TestAPIAuthenticationBypass tests that the API authentication middleware
 // properly blocks unauthorized requests and does not leak sensitive data.
 // This test reproduces the security issue described in:
-// - https://github.com/juanfont/headscale/issues/2809
-// - https://github.com/juanfont/headscale/pull/2810
+// - https://github.com/ownscalenet/headscale/issues/2809
+// - https://github.com/ownscalenet/headscale/pull/2810
 //
 // The bug: When authentication fails, the middleware writes "Unauthorized"
 // but doesn't return early, allowing the handler to execute and append

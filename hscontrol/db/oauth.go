@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"golang.org/x/crypto/argon2"
 	"gorm.io/gorm"
 	"tailscale.com/util/rands"

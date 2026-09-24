@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

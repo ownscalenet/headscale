@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/hscontrol/db"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/util"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
@@ -105,7 +105,7 @@ func TestTaggedReauthKeepsNilExpiry(t *testing.T) {
 // skipped, and the already-used one-shot PAK is re-validated and rejected with
 // "authkey already used" — logging the node out.
 //
-// https://github.com/juanfont/headscale/issues/3312
+// https://github.com/ownscalenet/headscale/issues/3312
 func TestTaggedReauthWithReusedUserPAK(t *testing.T) {
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
@@ -554,7 +554,7 @@ func (n seededTaggedNode) get(t *testing.T) types.NodeView {
 // processReauthTags silently drops the newly-requested tag — so this test
 // asserts on the resulting tag SET, not merely on the absence of an error.
 //
-// https://github.com/juanfont/headscale/issues/3374
+// https://github.com/ownscalenet/headscale/issues/3374
 func TestTaggedReauthAddTagAsOwner(t *testing.T) {
 	n := seedTagOwnedNode(t, []string{"tag:tag1"}, "")
 
@@ -848,7 +848,7 @@ func TestTaggedReauthPreservesOnlineAndLastSeen(t *testing.T) {
 }
 
 // TestIssue3371_TaggedNodeInteractiveReloginAfterLogout reproduces the
-// interactive/OIDC arm of https://github.com/juanfont/headscale/issues/3371
+// interactive/OIDC arm of https://github.com/ownscalenet/headscale/issues/3371
 // ("With no key (interactive): the register URL is printed and the login never
 // completes").
 //
@@ -1054,7 +1054,7 @@ func TestIssue3371_ExpiredTaggedNodeSameSpentKeyNotRevalidated(t *testing.T) {
 // for changing an auth-key device's tags, so a fresh key's tags must be
 // applied on re-registration.
 //
-// https://github.com/juanfont/headscale/issues/3370
+// https://github.com/ownscalenet/headscale/issues/3370
 func TestTaggedPAKReauthRetagsExistingTaggedNode(t *testing.T) {
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)

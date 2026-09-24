@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/mapper"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -1030,7 +1030,7 @@ func TestReAuthWithDifferentMachineKey(t *testing.T) {
 // TestUntaggedAuthKeyZeroExpiryGetsDefault tests that when node.expiry is configured
 // and a client registers with an untagged auth key without requesting a specific expiry,
 // the node gets the configured default expiry.
-// This is the core fix for https://github.com/juanfont/headscale/issues/1711
+// This is the core fix for https://github.com/ownscalenet/headscale/issues/1711
 func TestUntaggedAuthKeyZeroExpiryGetsDefault(t *testing.T) {
 	t.Parallel()
 
@@ -1349,7 +1349,7 @@ func tsLogoutSentinelExpiry() time.Time {
 }
 
 // TestIssue3371_TaggedNodeLogoutReloginSingleUseKey reproduces
-// https://github.com/juanfont/headscale/issues/3371 through the real
+// https://github.com/ownscalenet/headscale/issues/3371 through the real
 // register/logout HTTP-handler path (handleRegister -> handleLogout ->
 // handleRegister), not by poking SetNodeExpiry directly.
 //

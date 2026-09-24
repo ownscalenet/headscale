@@ -35,9 +35,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/capver"
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/integrationutil"
+	"github.com/ownscalenet/headscale/hscontrol/capver"
+	"github.com/ownscalenet/headscale/integration/dockertestutil"
+	"github.com/ownscalenet/headscale/integration/integrationutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/util/rands"

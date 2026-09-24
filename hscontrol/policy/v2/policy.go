@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/policy/matcher"
+	"github.com/ownscalenet/headscale/hscontrol/policy/policyutil"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"

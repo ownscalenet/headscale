@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/scope"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 )
 
 func init() {

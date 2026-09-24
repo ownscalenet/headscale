@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/util"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	"github.com/ownscalenet/headscale/hscontrol/util"
 	"github.com/spf13/cobra"
 )
 

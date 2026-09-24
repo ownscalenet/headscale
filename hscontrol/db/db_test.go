@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -148,7 +148,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// (202605221435-clear-zero-time-node-expiry). Pre-0.28 versions
 		// stored a zero time.Time as '0001-01-01 00:00:00+00:00' rather
 		// than NULL, which caused 0.29 to report those nodes as expired.
-		// Fixes: https://github.com/juanfont/headscale/issues/3284
+		// Fixes: https://github.com/ownscalenet/headscale/issues/3284
 		{
 			dbPath: "testdata/sqlite/zero_time_expiry_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
@@ -203,7 +203,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// marshals to the JSON literal 'null', so untagged nodes can carry
 		// tags='null' in the database. The migration must only clear
 		// user_id on genuinely tagged nodes, not on these untagged ones.
-		// Fixes: https://github.com/juanfont/headscale/issues/3323
+		// Fixes: https://github.com/ownscalenet/headscale/issues/3323
 		{
 			dbPath: "testdata/sqlite/null_tags_user_id_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
@@ -253,7 +253,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// already upgraded to 0.29.0 had user_id wrongly cleared on untagged
 		// nodes with tags='null'. The recovery migration re-derives user_id
 		// from the node's pre-auth key where one exists.
-		// Fixes: https://github.com/juanfont/headscale/issues/3323
+		// Fixes: https://github.com/ownscalenet/headscale/issues/3323
 		{
 			dbPath: "testdata/sqlite/recover_null_tags_user_id_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
@@ -300,7 +300,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		// a key expiry on tagged nodes, which never expire (KB 1068), leaving
 		// them permanently Expired. The migration clears expiry on tagged rows
 		// only, preserving user-owned nodes' expiry.
-		// Fixes: https://github.com/juanfont/headscale/issues/3371
+		// Fixes: https://github.com/ownscalenet/headscale/issues/3371
 		{
 			dbPath: "testdata/sqlite/clear_tagged_node_expiry_migration_test.sql",
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {

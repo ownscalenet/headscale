@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -391,7 +391,7 @@ var (
 )
 
 // TestOIDCLoginDoesNotParkTheBrowserOnTheCodeURL reproduces
-// https://github.com/juanfont/headscale/issues/3365.
+// https://github.com/ownscalenet/headscale/issues/3365.
 //
 // Before this regression was fixed, the interactive OIDC flow wrote the
 // confirmation interstitial as the body of the /oidc/callback response.

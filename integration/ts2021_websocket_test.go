@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/tsic"
+	"github.com/ownscalenet/headscale/integration/dockertestutil"
+	"github.com/ownscalenet/headscale/integration/hsic"
+	"github.com/ownscalenet/headscale/integration/tsic"
 	"github.com/ory/dockertest/v3"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"

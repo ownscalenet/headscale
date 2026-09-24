@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/ownscalenet/headscale/hscontrol/db"
+	"github.com/ownscalenet/headscale/hscontrol/mapper"
+	"github.com/ownscalenet/headscale/hscontrol/state"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -285,7 +285,7 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 // long-poll reconnect attempt which fails before [state.State.Connect] must
 // not cancel a previously armed ephemeral GC timer. Cancelling at the start of
 // [mapSession.serveLongPoll] left departed ephemeral nodes stuck offline with
-// no deletion scheduled (https://github.com/juanfont/headscale/issues/3382).
+// no deletion scheduled (https://github.com/ownscalenet/headscale/issues/3382).
 func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 	t.Parallel()
 
@@ -344,7 +344,7 @@ func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 
 // TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession
 // tests the scenario reported in
-// https://github.com/juanfont/headscale/issues/3129.
+// https://github.com/ownscalenet/headscale/issues/3129.
 //
 // Scenario:
 //  1. Start a real long-poll session for one node.
@@ -459,7 +459,7 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 // It also pins the teardown latency: a deleted node cannot reconnect, so the
 // session must not spend the reconnect grace period waiting for one.
 //
-// See: https://github.com/juanfont/headscale/issues/3410
+// See: https://github.com/ownscalenet/headscale/issues/3410
 func TestDeletedNodeEndsLongPoll(t *testing.T) {
 	t.Parallel()
 

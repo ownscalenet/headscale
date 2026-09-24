@@ -59,7 +59,7 @@ linters:
         - pattern: '\.(Str|Int|Int8|Int16|Int32|Int64|Uint|Uint8|Uint16|Uint32|Uint64|Float32|Float64|Bool|Dur|Time|TimeDiff|Strs|Ints|Uints|Floats|Bools|Any|Interface)\("[^"]+"'
           msg: >-
             Use zf.* constants for zerolog field names instead of string literals.
-            Import "github.com/juanfont/headscale/hscontrol/util/zlog/zf" and use
+            Import "github.com/ownscalenet/headscale/hscontrol/util/zlog/zf" and use
             constants like zf.NodeID, zf.UserName, etc. Add new constants to
             hscontrol/util/zlog/zf/fields.go if needed.
         # Forbid ptr.To - use Go 1.26 new(expr) instead

@@ -20,7 +20,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/juanfont/headscale/integration/dockertestutil"
+	"github.com/ownscalenet/headscale/integration/dockertestutil"
 )
 
 const defaultDirPerm = 0o755

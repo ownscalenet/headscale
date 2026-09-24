@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
+	apiv1 "github.com/ownscalenet/headscale/hscontrol/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/arl/statsviz"
-	"github.com/juanfont/headscale/hscontrol/templates"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/ownscalenet/headscale/hscontrol/templates"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types/change"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tsweb"

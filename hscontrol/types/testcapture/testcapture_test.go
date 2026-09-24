@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/ownscalenet/headscale/hscontrol/types/testcapture"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"
 )

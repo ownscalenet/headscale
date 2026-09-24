@@ -3,8 +3,8 @@ package integration
 import (
 	"testing"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/types"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

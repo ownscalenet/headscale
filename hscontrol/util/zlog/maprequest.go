@@ -1,7 +1,7 @@
 package zlog
 
 import (
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/ownscalenet/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"tailscale.com/tailcfg"
 )

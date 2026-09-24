@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/netipx"
@@ -6281,7 +6281,7 @@ func TestValidateCapabilityName(t *testing.T) {
 	}
 }
 
-// TestPolicyMetadataFields covers https://github.com/juanfont/headscale/issues/3479:
+// TestPolicyMetadataFields covers https://github.com/ownscalenet/headscale/issues/3479:
 // the '#'-prefixed metadata escape hatch added for headscale-admin lives in
 // [ACL.UnmarshalJSON] only, so every other policy object still hits
 // RejectUnknownMembers and rejects the same metadata.

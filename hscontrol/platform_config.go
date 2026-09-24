@@ -8,7 +8,7 @@ import (
 	"uuid"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/templates"
+	"github.com/ownscalenet/headscale/hscontrol/templates"
 )
 
 // WindowsConfigMessage shows a simple message in the browser for how to configure the Windows Tailscale client.

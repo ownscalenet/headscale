@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/capver"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/capver"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -119,7 +119,7 @@ func TestVerifyHandler_SuccessSetsJSONContentType(t *testing.T) {
 }
 
 // TestKeyHandler_UnsupportedCapVerDoesNotLeakKey reproduces
-// https://github.com/juanfont/headscale/issues/3380. The /key handler
+// https://github.com/ownscalenet/headscale/issues/3380. The /key handler
 // must gate key disclosure on the same floor the Noise handshake
 // enforces (capver.MinSupportedCapabilityVersion). A capability version
 // below that floor can never complete a handshake, so it must be

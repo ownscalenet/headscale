@@ -5,7 +5,7 @@
 // regular grants, and multiple HA pairs.
 //
 // Test data source: ../policy/v2/testdata/grant_results/via-grant-v{37..46}.hujson
-// Source format:    github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format:    github.com/ownscalenet/headscale/hscontrol/types/testcapture
 
 package servertest_test
 
@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/ownscalenet/headscale/hscontrol/servertest"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"

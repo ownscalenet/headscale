@@ -4,11 +4,11 @@ import (
 	"context"
 	"net/netip"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/integration/hsic"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	"github.com/ownscalenet/headscale/hscontrol"
+	policyv2 "github.com/ownscalenet/headscale/hscontrol/policy/v2"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/integration/hsic"
 	"github.com/ory/dockertest/v3"
 	"tailscale.com/tailcfg"
 )

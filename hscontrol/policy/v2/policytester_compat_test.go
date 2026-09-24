@@ -16,7 +16,7 @@
 // these are real Tailscale ↔ headscale divergences uncovered by the
 // captures that need engine-level fixes in follow-up PRs.
 //
-// Source format: github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format: github.com/ownscalenet/headscale/hscontrol/types/testcapture
 
 package v2
 
@@ -25,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )

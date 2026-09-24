@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
+	"github.com/ownscalenet/headscale/hscontrol/servertest"
 	"github.com/stretchr/testify/require"
 )
 

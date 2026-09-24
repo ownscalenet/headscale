@@ -14,10 +14,10 @@ import (
 
 	"github.com/glebarez/sqlite"
 	"github.com/go-gormigrate/gormigrate/v2"
-	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
-	"github.com/juanfont/headscale/hscontrol/policy"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/hscontrol/db/sqliteconfig"
+	"github.com/ownscalenet/headscale/hscontrol/policy"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"github.com/tailscale/squibble"
 	"gorm.io/driver/postgres"
@@ -601,7 +601,7 @@ AND auth_key_id NOT IN (
 				// host_info.RequestTags, not in the tags column (formerly forced_tags).
 				// This migration validates RequestTags against the policy's tagOwners
 				// and merges validated tags into the tags column.
-				// Fixes: https://github.com/juanfont/headscale/issues/3006
+				// Fixes: https://github.com/ownscalenet/headscale/issues/3006
 				ID: "202601121700-migrate-hostinfo-request-tags",
 				Migrate: func(tx *gorm.DB) error {
 					// 1. Load policy from file or database based on configuration
@@ -712,8 +712,8 @@ AND auth_key_id NOT IN (
 				// excluded alongside '[]' and '' or untagged nodes lose their
 				// user. Nodes already detached by the earlier version of this
 				// migration are repaired by the recovery migration below.
-				// Fixes: https://github.com/juanfont/headscale/issues/3077
-				// Fixes: https://github.com/juanfont/headscale/issues/3323
+				// Fixes: https://github.com/ownscalenet/headscale/issues/3077
+				// Fixes: https://github.com/ownscalenet/headscale/issues/3323
 				ID: "202602201200-clear-tagged-node-user-id",
 				Migrate: func(tx *gorm.DB) error {
 					err := tx.Exec(`
@@ -761,7 +761,7 @@ WHERE expiry IS NOT NULL AND expiry < '1900-01-01';
 				// re-derived from the node's pre-auth key, so nodes registered
 				// via CLI/OIDC (no pre-auth key) cannot be recovered and must
 				// be reassigned manually.
-				// Fixes: https://github.com/juanfont/headscale/issues/3323
+				// Fixes: https://github.com/ownscalenet/headscale/issues/3323
 				ID: "202606181200-recover-null-tags-node-user-id",
 				Migrate: func(tx *gorm.DB) error {
 					err := tx.Exec(`
@@ -910,7 +910,7 @@ WHERE user_id IS NULL
 				// Match the tagged-node predicate the earlier
 				// clear-tagged-node-user-id migration uses (a nil tags slice
 				// marshals to 'null', so exclude it).
-				// Fixes: https://github.com/juanfont/headscale/issues/3371
+				// Fixes: https://github.com/ownscalenet/headscale/issues/3371
 				ID: "202607241200-clear-tagged-node-expiry",
 				Migrate: func(tx *gorm.DB) error {
 					err := tx.Exec(`

@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/spf13/cobra"
 )
 

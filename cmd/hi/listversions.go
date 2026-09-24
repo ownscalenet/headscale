@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/creachadair/command"
-	"github.com/juanfont/headscale/hscontrol/capver"
+	"github.com/ownscalenet/headscale/hscontrol/capver"
 )
 
 var (

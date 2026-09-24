@@ -17,7 +17,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
 )

@@ -5,7 +5,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/scope"
+	"github.com/ownscalenet/headscale/hscontrol/scope"
 )
 
 // selfEnforcedKeyOps are the authenticated operations that intentionally declare

@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 )
 

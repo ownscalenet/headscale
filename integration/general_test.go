@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/integration/hsic"
+	"github.com/ownscalenet/headscale/integration/integrationutil"
+	"github.com/ownscalenet/headscale/integration/tsic"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -1762,7 +1762,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 // node that no longer existed, and the server could not shut down while that
 // stream was open.
 //
-// See: https://github.com/juanfont/headscale/issues/3410
+// See: https://github.com/ownscalenet/headscale/issues/3410
 func TestNodeDeletionEndsLongPoll(t *testing.T) {
 	IntegrationSkip(t)
 	t.Parallel()

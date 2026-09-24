@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strings"
 
-	clientv2 "github.com/juanfont/headscale/gen/client/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
+	clientv2 "github.com/ownscalenet/headscale/gen/client/v2"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/spf13/cobra"
 )
 

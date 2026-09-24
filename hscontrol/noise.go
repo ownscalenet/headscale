@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
-	"github.com/juanfont/headscale/hscontrol/capver"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/capver"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/http2"
@@ -714,7 +714,7 @@ func (ns *noiseServer) PollNetMapHandler(
 		// in the past drives them to NeedsLogin. There is no MapResponse field
 		// that says "deleted", so reuse the expiry signal headscale already
 		// sends for expired nodes.
-		// See: https://github.com/juanfont/headscale/issues/3410
+		// See: https://github.com/ownscalenet/headscale/issues/3410
 		if errors.Is(err, errNodeNotInStore) && mapRequest.Stream {
 			expired := &tailcfg.MapResponse{
 				Node: &tailcfg.Node{

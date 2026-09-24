@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/db"
+	"github.com/ownscalenet/headscale/hscontrol/db"
 	"github.com/stretchr/testify/require"
 )
 

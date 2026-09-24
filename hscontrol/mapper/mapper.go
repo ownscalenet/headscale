@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/ownscalenet/headscale/hscontrol/state"
+	"github.com/ownscalenet/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"

@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strconv"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	"github.com/ownscalenet/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )

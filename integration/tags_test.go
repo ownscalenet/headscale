@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/ownscalenet/headscale/gen/client/v1"
+	policyv2 "github.com/ownscalenet/headscale/hscontrol/policy/v2"
+	"github.com/ownscalenet/headscale/hscontrol/util"
+	"github.com/ownscalenet/headscale/integration/hsic"
+	"github.com/ownscalenet/headscale/integration/integrationutil"
+	"github.com/ownscalenet/headscale/integration/tsic"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -594,7 +594,7 @@ func TestTagsAuthKeyWithTagAdminOverrideReauthPreserves(t *testing.T) {
 // propagates to the node's own Self view and netmap, and the node ID and IPs are
 // unchanged.
 //
-// https://github.com/juanfont/headscale/issues/3370
+// https://github.com/ownscalenet/headscale/issues/3370
 func TestTagsReauthDifferentKeyRetagsNode(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -700,7 +700,7 @@ func TestTagsReauthDifferentKeyRetagsNode(t *testing.T) {
 // *removed*, not retained. Tag removal is the highest-risk propagation path
 // (peers must stop seeing the removed tag), so it is worth a real-client test.
 //
-// https://github.com/juanfont/headscale/issues/3370
+// https://github.com/ownscalenet/headscale/issues/3370
 func TestTagsReauthDifferentKeyRemovesTag(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -3423,7 +3423,7 @@ func TestTagsAuthKeyConvertToUserViaCLIRegister(t *testing.T) {
 // The observable proof at the integration level is that after relogin the node
 // is back online with a NULL expiry and the same node ID — not stuck expired.
 //
-// https://github.com/juanfont/headscale/issues/3371
+// https://github.com/ownscalenet/headscale/issues/3371
 func TestTaggedNodeLogoutReloginSingleUseKeyOnline(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -3530,7 +3530,7 @@ func TestTaggedNodeLogoutReloginSingleUseKeyOnline(t *testing.T) {
 // node still stayed expired, so the client never observed a non-expired node.
 // The observable proof is the same: online with NULL expiry after relogin.
 //
-// https://github.com/juanfont/headscale/issues/3371
+// https://github.com/ownscalenet/headscale/issues/3371
 func TestTaggedNodeLogoutReloginReusableKeyOnline(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -3625,7 +3625,7 @@ func TestTaggedNodeLogoutReloginReusableKeyOnline(t *testing.T) {
 // only logs), so it catches the silent-drop where the pre-check passes but the
 // apply-time re-check in processReauthTags still rejects.
 //
-// https://github.com/juanfont/headscale/issues/3374
+// https://github.com/ownscalenet/headscale/issues/3374
 func TestTagsOIDCReauthAddOwnedTag(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -3757,7 +3757,7 @@ func TestTagsOIDCReauthAddOwnedTag(t *testing.T) {
 // and is garbage-collected on its next disconnect, silently deleting the
 // user's just-claimed device.
 //
-// https://github.com/juanfont/headscale/issues/3374
+// https://github.com/ownscalenet/headscale/issues/3374
 func TestTagsReauthEmptyTagsReturnsToUserSurvives(t *testing.T) {
 	IntegrationSkip(t)
 

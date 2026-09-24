@@ -18,8 +18,8 @@ import (
 	"os"
 	"path/filepath"
 
-	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
+	apiv1 "github.com/ownscalenet/headscale/hscontrol/api/v1"
+	apiv2 "github.com/ownscalenet/headscale/hscontrol/api/v2"
 )
 
 // spec bundles a version's full (3.1) and downgraded (3.0.3) generators with the

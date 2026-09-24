@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"tailscale.com/control/controlclient"
 	"tailscale.com/health"
 	"tailscale.com/net/netmon"

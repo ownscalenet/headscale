@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/ownscalenet/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -259,7 +259,7 @@ func checkVersionUpgradePath(db *gorm.DB) error {
 			"headscale version %s cannot be used with a database last used by %s, "+
 				"upgrading more than one minor version at a time is not supported, "+
 				"please upgrade to the latest v%d.%d.x release first, then to %s, "+
-				"release page: https://github.com/juanfont/headscale/releases: %w",
+				"release page: https://github.com/ownscalenet/headscale/releases: %w",
 			currentVersion, storedVersion,
 			stored.Major, stored.Minor+1,
 			current.String(),
@@ -271,7 +271,7 @@ func checkVersionUpgradePath(db *gorm.DB) error {
 		return fmt.Errorf(
 			"headscale version %s cannot be used with a database last used by %s, "+
 				"downgrading to a previous minor version is not supported, "+
-				"release page: https://github.com/juanfont/headscale/releases: %w",
+				"release page: https://github.com/ownscalenet/headscale/releases: %w",
 			currentVersion, storedVersion,
 			errVersionDowngrade,
 		)
