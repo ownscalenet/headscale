@@ -258,8 +258,9 @@ func (pol *Policy) compileSSHPolicy(
 	node types.NodeView,
 	nodes views.Slice[types.NodeView],
 ) (*tailcfg.SSHPolicy, error) {
+	// If no ssh rules, send an empty SSHPolicy so all access is cut. #3508
 	if pol == nil || pol.SSHs == nil || len(pol.SSHs) == 0 {
-		return nil, nil //nolint:nilnil // intentional: no SSH policy when none configured
+		return &tailcfg.SSHPolicy{}, nil
 	}
 
 	log.Trace().Caller().Msgf("compiling SSH policy for node %q", node.Hostname())

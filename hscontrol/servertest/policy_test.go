@@ -1,6 +1,7 @@
 package servertest_test
 
 import (
+	"encoding/json"
 	"net/netip"
 	"testing"
 	"time"
@@ -233,4 +234,87 @@ func TestIPv6OnlyPrefixACL(t *testing.T) {
 
 	assert.False(t, foundIPv4Dst,
 		"test2 PacketFilter should NOT contain IPv4 destination 100.64.0.2 when policy only specifies IPv6 hosts")
+}
+
+// TestSSHPolicyRemovalClearsClientRules verifies that removing a policy's
+// SSH rules clears them on connected clients. #3508
+func TestSSHPolicyRemovalClearsClientRules(t *testing.T) {
+	t.Parallel()
+
+	const withSSH = `{
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+		"ssh": [{
+			"action": "accept",
+			"src": ["autogroup:member"],
+			"dst": ["autogroup:self"],
+			"users": ["autogroup:nonroot"]
+		}]
+	}`
+
+	// Both policies narrow the ACLs to port 22, so the client's packet filter
+	// shows when the map response for the new policy has been applied.
+	tests := []struct {
+		name  string
+		after string
+	}{
+		{
+			name:  "ssh section removed",
+			after: `{"acls": [{"action": "accept", "src": ["*"], "dst": ["*:22"]}]}`,
+		},
+		{
+			name: "empty ssh list",
+			after: `{
+				"acls": [{"action": "accept", "src": ["*"], "dst": ["*:22"]}],
+				"ssh": []
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Both clients belong to the harness's default user, so each is
+			// the other's autogroup:self.
+			h := servertest.NewHarness(t, 2)
+			c := h.Client(1)
+
+			h.ChangePolicy(t, []byte(withSSH))
+			c.WaitForCondition(t, "ssh rules delivered", 10*time.Second,
+				func(nm *netmap.NetworkMap) bool {
+					return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) > 0
+				})
+
+			h.ChangePolicy(t, []byte(tt.after))
+			// The packet filter and SSH policy arrive in the same map
+			// response, so once the filter is narrowed the SSH change
+			// has been applied too.
+			c.WaitForCondition(t, "packet filter from the new policy", 10*time.Second,
+				onlyPort22)
+
+			nm := c.Netmap()
+			require.NotNil(t, nm)
+			got, err := json.Marshal(nm.SSHPolicy)
+			require.NoError(t, err)
+			assert.True(t, nm.SSHPolicy == nil || len(nm.SSHPolicy.Rules) == 0,
+				"client still holds SSH rules after they were removed from the policy: "+string(got))
+		})
+	}
+}
+
+// onlyPort22 reports whether nm's packet filter only allows port 22.
+func onlyPort22(nm *netmap.NetworkMap) bool {
+	if len(nm.PacketFilter) == 0 {
+		return false
+	}
+
+	for _, m := range nm.PacketFilter {
+		for _, dst := range m.Dsts {
+			if dst.Ports.First != 22 || dst.Ports.Last != 22 {
+				return false
+			}
+		}
+	}
+
+	return true
 }

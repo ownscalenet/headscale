@@ -461,6 +461,31 @@ func TestSSHPolicyRules(t *testing.T) {
 			wantSSH: &tailcfg.SSHPolicy{Rules: nil},
 		},
 		{
+			// Clients keep their previous SSH rules on a nil policy, so a
+			// policy without SSH rules must yield an empty, non-nil one.
+			name:       "no-ssh-section",
+			targetNode: nodeUser2,
+			peers:      types.Nodes{&nodeUser1},
+			policy: `{
+				"acls": [
+					{"action": "accept", "src": ["*"], "dst": ["*:*"]}
+				]
+			}`,
+			wantSSH: &tailcfg.SSHPolicy{},
+		},
+		{
+			name:       "empty-ssh-section",
+			targetNode: nodeUser2,
+			peers:      types.Nodes{&nodeUser1},
+			policy: `{
+				"acls": [
+					{"action": "accept", "src": ["*"], "dst": ["*:*"]}
+				],
+				"ssh": []
+			}`,
+			wantSSH: &tailcfg.SSHPolicy{},
+		},
+		{
 			name:       "invalid-action",
 			targetNode: nodeTaggedServer,
 			peers:      types.Nodes{&nodeUser2},
