@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os/signal"
 	"syscall"
 
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -29,7 +30,12 @@ var serveCmd = &cobra.Command{
 			return fmt.Errorf("initializing: %w", err)
 		}
 
-		err = app.Serve()
+		ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+		defer stop()
+
+		defer installReloadHandler(ctx, app)()
+
+		err = app.Serve(ctx)
 		if err == nil || errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
