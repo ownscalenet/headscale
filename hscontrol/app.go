@@ -16,13 +16,11 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -538,8 +536,14 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 
 // Serve launches the HTTP servers that run Headscale and its API.
 //
+// It blocks until ctx is cancelled or a listener fails, and releases all
+// resources (listeners, batcher, database) before returning. The
+// Headscale value cannot be reused afterwards; create a new one with
+// [NewHeadscale] to restart. Serve does not handle process signals; see
+// [Headscale.ReloadPolicy] for SIGHUP-style reloads.
+//
 //nolint:gocyclo // complex server startup function
-func (h *Headscale) Serve() error {
+func (h *Headscale) Serve(ctx context.Context) error {
 	var err error
 
 	capver.CanOldCodeBeCleanedUp()
@@ -567,10 +571,129 @@ func (h *Headscale) Serve() error {
 		Str("minimum_version", capver.TailscaleVersion(capver.MinSupportedCapabilityVersion)).
 		Msg("Clients with a lower minimum version will be rejected")
 
-	h.mapBatcher = mapper.NewBatcherAndMapper(h.cfg, h.state)
+	// Everything started below hangs off this context and errgroup: a
+	// failing listener or a cancelled ctx triggers stop.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	errorGroup, ctx := errgroup.WithContext(ctx)
+
+	var (
+		socketServer        *http.Server
+		socketListener      net.Listener
+		httpServer          *http.Server
+		httpListener        net.Listener
+		debugHTTPServer     *http.Server
+		debugHTTPListener   net.Listener
+		insecureTLSServer   *http.Server
+		insecureTLSListener net.Listener
+		tlsB                *tlsBundle
+	)
+
+	h.mapBatcher = mapper.NewBatcherAndMapper(h.cfg, h.state)
 	h.mapBatcher.Start()
-	defer h.mapBatcher.Close()
+
+	// stop runs on every return path, so failed startups don't leak the
+	// database or listeners.
+	stop := sync.OnceFunc(func() {
+		info := func(msg string) { log.Info().Msg(msg) }
+
+		info("shutting down headscale")
+
+		cancel()
+		h.ephemeralGC.Close()
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(
+			context.WithoutCancel(ctx),
+			types.HTTPShutdownTimeout,
+		)
+		defer shutdownCancel()
+
+		if debugHTTPServer != nil {
+			info("shutting down debug http server")
+
+			err := debugHTTPServer.Shutdown(shutdownCtx)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to shutdown prometheus http")
+			}
+		}
+
+		if httpServer != nil {
+			info("shutting down main http server")
+
+			err := httpServer.Shutdown(shutdownCtx)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to shutdown http")
+			}
+		}
+
+		if insecureTLSServer != nil {
+			info("shutting down insecure TLS server")
+
+			err := insecureTLSServer.Shutdown(shutdownCtx)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to shutdown insecure TLS server")
+			}
+		}
+
+		if tlsB != nil && tlsB.ACMEServer != nil {
+			info("shutting down ACME HTTP-01 challenge server")
+
+			err := tlsB.ACMEServer.Shutdown(shutdownCtx)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to shutdown ACME HTTP-01 server")
+			}
+
+			tlsB.ACMEListener.Close()
+		}
+
+		info("closing batcher")
+		h.mapBatcher.Close()
+
+		info("waiting for netmap stream to close")
+		h.clientStreamsOpen.Wait()
+
+		if socketServer != nil {
+			info("shutting down api server (socket)")
+
+			if err := socketServer.Shutdown(shutdownCtx); err != nil { //nolint:noinlineerr
+				log.Error().Err(err).Msg("failed to shutdown socket server")
+			}
+		}
+
+		if h.extraRecordMan != nil {
+			h.extraRecordMan.Close()
+		}
+
+		// Stop listening (and unlink the socket if unix type):
+		info("closing network listeners")
+
+		if debugHTTPListener != nil {
+			debugHTTPListener.Close()
+		}
+
+		if httpListener != nil {
+			httpListener.Close()
+		}
+
+		if insecureTLSListener != nil {
+			insecureTLSListener.Close()
+		}
+
+		if socketListener != nil {
+			socketListener.Close()
+		}
+
+		info("closing state and database")
+
+		err := h.state.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close state")
+		}
+
+		log.Info().Msg("Headscale stopped")
+	})
+	defer stop()
 
 	if h.cfg.DERP.ServerEnabled {
 		// When embedded DERP is enabled we always need a STUN server
@@ -578,7 +701,7 @@ func (h *Headscale) Serve() error {
 			return errSTUNAddressNotSet
 		}
 
-		go h.DERPServer.ServeSTUN()
+		errorGroup.Go(func() error { return h.DERPServer.ServeSTUN(ctx) })
 	}
 
 	derpMap, err := derp.GetDERPMap(h.cfg.DERP)
@@ -621,23 +744,11 @@ func (h *Headscale) Serve() error {
 		h.cfg.SetExtraRecords(h.extraRecordMan.Records())
 
 		go h.extraRecordMan.Run()
-		defer h.extraRecordMan.Close()
 	}
 
 	// Start all scheduled tasks, e.g. expiring nodes, derp updates and
 	// records updates
-	scheduleCtx, scheduleCancel := context.WithCancel(context.Background())
-	defer scheduleCancel()
-
-	go h.scheduledTasks(scheduleCtx)
-
-	// Prepare group for running listeners
-	errorGroup := new(errgroup.Group)
-
-	ctx := context.Background()
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	go h.scheduledTasks(ctx)
 
 	//
 	//
@@ -656,7 +767,7 @@ func (h *Headscale) Serve() error {
 		return fmt.Errorf("setting up unix socket: %w", err)
 	}
 
-	socketListener, err := new(net.ListenConfig).Listen(context.Background(), "unix", h.cfg.UnixSocket)
+	socketListener, err = new(net.ListenConfig).Listen(ctx, "unix", h.cfg.UnixSocket)
 	if err != nil {
 		return fmt.Errorf("setting up socket: %w", err)
 	}
@@ -693,24 +804,24 @@ func (h *Headscale) Serve() error {
 	socketHandler.Handle("/api/v2/", apiv2.WithLocalTrust(humaV2Mux))
 	socketHandler.Handle("/", apiv1.WithLocalTrust(humaMux))
 
-	socketServer := &http.Server{
+	socketServer = &http.Server{
 		Handler:     socketHandler,
 		ReadTimeout: types.HTTPTimeout,
 	}
 
-	errorGroup.Go(func() error { return socketServer.Serve(socketListener) })
+	errorGroup.Go(func() error { return ignoreServerClosed(socketServer.Serve(socketListener)) })
 
 	//
 	//
 	// Set up REMOTE listeners
 	//
 
-	tlsBundle, err := h.getTLSSettings(ctx)
+	tlsB, err = h.getTLSSettings(ctx)
 	if err != nil {
 		return fmt.Errorf("configuring TLS settings: %w", err)
 	}
 
-	tlsConfig := tlsBundle.Config
+	tlsConfig := tlsB.Config
 
 	//
 	//
@@ -720,7 +831,7 @@ func (h *Headscale) Serve() error {
 	// over our main Addr
 	router := h.createRouter(humaMux, humaV2Mux)
 
-	httpServer := &http.Server{
+	httpServer = &http.Server{
 		Addr:        h.cfg.Addr,
 		Handler:     router,
 		ReadTimeout: types.HTTPTimeout,
@@ -730,13 +841,11 @@ func (h *Headscale) Serve() error {
 		WriteTimeout: types.HTTPTimeout,
 	}
 
-	var httpListener net.Listener
-
 	if tlsConfig != nil {
 		httpServer.TLSConfig = tlsConfig
 		httpListener, err = tls.Listen("tcp", h.cfg.Addr, tlsConfig)
 	} else {
-		httpListener, err = new(net.ListenConfig).Listen(context.Background(), "tcp", h.cfg.Addr)
+		httpListener, err = new(net.ListenConfig).Listen(ctx, "tcp", h.cfg.Addr)
 	}
 
 	if err != nil {
@@ -748,15 +857,10 @@ func (h *Headscale) Serve() error {
 		}
 	}
 
-	errorGroup.Go(func() error { return httpServer.Serve(httpListener) })
+	errorGroup.Go(func() error { return ignoreServerClosed(httpServer.Serve(httpListener)) })
 
 	log.Info().
 		Msgf("listening and serving HTTP on: %s", h.cfg.Addr)
-
-	var (
-		insecureTLSServer   *http.Server
-		insecureTLSListener net.Listener
-	)
 
 	if addr := derpServer.DebugInsecureTLSListenAddr(); addr != "" {
 		insecureTLSConfig, err := selfSignedTLSConfig()
@@ -780,20 +884,20 @@ func (h *Headscale) Serve() error {
 			WriteTimeout: types.HTTPTimeout,
 		}
 
-		errorGroup.Go(func() error { return insecureTLSServer.Serve(insecureTLSListener) })
+		errorGroup.Go(func() error { return ignoreServerClosed(insecureTLSServer.Serve(insecureTLSListener)) })
 
 		log.Warn().
 			Str("addr", addr).
 			Msg("serving TLS with a self-signed certificate (HEADSCALE_DEBUG_INSECURE_TLS_LISTEN_ADDR); for tests only")
 	}
 
-	if tlsBundle.ACMEServer != nil {
+	if tlsB.ACMEServer != nil {
 		log.Info().Msgf(
 			"listening and serving ACME HTTP-01 challenge on: %s",
-			tlsBundle.ACMEListener.Addr())
+			tlsB.ACMEListener.Addr())
 		errorGroup.Go(func() error {
-			err := tlsBundle.ACMEServer.Serve(tlsBundle.ACMEListener)
-			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			err := ignoreServerClosed(tlsB.ACMEServer.Serve(tlsB.ACMEListener))
+			if err != nil {
 				return fmt.Errorf("ACME HTTP-01 challenge listener: %w", err)
 			}
 
@@ -802,10 +906,6 @@ func (h *Headscale) Serve() error {
 	}
 
 	// Only start debug/metrics server if address is configured
-	var debugHTTPServer *http.Server
-
-	var debugHTTPListener net.Listener
-
 	if h.cfg.MetricsAddr != "" {
 		debugHTTPListener, err = (&net.ListenConfig{}).Listen(ctx, "tcp", h.cfg.MetricsAddr)
 		if err != nil {
@@ -819,15 +919,13 @@ func (h *Headscale) Serve() error {
 
 		debugHTTPServer = h.debugHTTPServer()
 
-		errorGroup.Go(func() error { return debugHTTPServer.Serve(debugHTTPListener) })
+		errorGroup.Go(func() error { return ignoreServerClosed(debugHTTPServer.Serve(debugHTTPListener)) })
 
 		log.Info().
 			Msgf("listening and serving debug and metrics on: %s", h.cfg.MetricsAddr)
 	} else {
 		log.Info().Msg("metrics server disabled (metrics_listen_addr is empty)")
 	}
-
-	var tailsqlCancel context.CancelFunc
 
 	if tailsqlEnabled {
 		if h.cfg.Database.Type != types.DatabaseSqlite {
@@ -842,156 +940,47 @@ func (h *Headscale) Serve() error {
 			log.Fatal().Msg("tailsql requires TS_AUTHKEY to be set")
 		}
 
-		var tailsqlCtx context.Context
-
-		tailsqlCtx, tailsqlCancel = context.WithCancel(ctx)
-
 		errorGroup.Go(func() error {
-			return runTailSQLService(tailsqlCtx, util.TSLogfWrapper(), tailsqlStateDir, h.cfg.Database.Sqlite.Path)
+			return runTailSQLService(ctx, util.TSLogfWrapper(), tailsqlStateDir, h.cfg.Database.Sqlite.Path)
 		})
 	}
 
-	// Handle common process-killing signals so we can gracefully shut down:
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT,
-		syscall.SIGHUP)
-
-	sigFunc := func(c chan os.Signal) {
-		// Wait for a SIGINT or SIGKILL:
-		for {
-			sig := <-c
-			switch sig {
-			case syscall.SIGHUP:
-				log.Info().
-					Str("signal", sig.String()).
-					Msg("Received SIGHUP, reloading ACL policy")
-
-				if h.cfg.Policy.IsEmpty() {
-					continue
-				}
-
-				changes, err := h.state.ReloadPolicy()
-				h.Change(changes...)
-
-				if err != nil {
-					log.Error().Err(err).Msgf("reloading policy")
-					continue
-				}
-
-			default:
-				info := func(msg string) { log.Info().Msg(msg) }
-
-				log.Info().
-					Str("signal", sig.String()).
-					Msg("Received signal to stop, shutting down gracefully")
-
-				scheduleCancel()
-				h.ephemeralGC.Close()
-
-				// Gracefully shut down servers
-				shutdownCtx, cancel := context.WithTimeout(
-					context.WithoutCancel(ctx),
-					types.HTTPShutdownTimeout,
-				)
-				defer cancel()
-
-				if debugHTTPServer != nil {
-					info("shutting down debug http server")
-
-					err := debugHTTPServer.Shutdown(shutdownCtx)
-					if err != nil {
-						log.Error().Err(err).Msg("failed to shutdown prometheus http")
-					}
-				}
-
-				info("shutting down main http server")
-
-				err := httpServer.Shutdown(shutdownCtx)
-				if err != nil {
-					log.Error().Err(err).Msg("failed to shutdown http")
-				}
-
-				if insecureTLSServer != nil {
-					info("shutting down insecure TLS server")
-
-					err := insecureTLSServer.Shutdown(shutdownCtx)
-					if err != nil {
-						log.Error().Err(err).Msg("failed to shutdown insecure TLS server")
-					}
-				}
-
-				if tlsBundle.ACMEServer != nil {
-					info("shutting down ACME HTTP-01 challenge server")
-
-					err := tlsBundle.ACMEServer.Shutdown(shutdownCtx)
-					if err != nil {
-						log.Error().Err(err).Msg("failed to shutdown ACME HTTP-01 server")
-					}
-
-					tlsBundle.ACMEListener.Close()
-				}
-
-				info("closing batcher")
-				h.mapBatcher.Close()
-
-				info("waiting for netmap stream to close")
-				h.clientStreamsOpen.Wait()
-
-				info("shutting down api server (socket)")
-
-				if err := socketServer.Shutdown(shutdownCtx); err != nil { //nolint:noinlineerr
-					log.Error().Err(err).Msg("failed to shutdown socket server")
-				}
-
-				if tailsqlCancel != nil {
-					info("shutting down tailsql")
-					tailsqlCancel()
-				}
-
-				// Close network listeners
-				info("closing network listeners")
-
-				if debugHTTPListener != nil {
-					debugHTTPListener.Close()
-				}
-
-				httpListener.Close()
-
-				if insecureTLSListener != nil {
-					insecureTLSListener.Close()
-				}
-
-				// Stop listening (and unlink the socket if unix type):
-				info("closing socket listener")
-				socketListener.Close()
-
-				// Close state connections
-				info("closing state and database")
-
-				err = h.state.Close()
-				if err != nil {
-					log.Error().Err(err).Msg("failed to close state")
-				}
-
-				log.Info().
-					Msg("Headscale stopped")
-
-				return
-			}
-		}
-	}
-
 	errorGroup.Go(func() error {
-		sigFunc(sigc)
+		<-ctx.Done()
+		stop()
 
 		return nil
 	})
 
 	return errorGroup.Wait()
+}
+
+// ignoreServerClosed maps the http.ErrServerClosed a graceful Shutdown
+// produces to nil.
+func ignoreServerClosed(err error) error {
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+
+	return err
+}
+
+// ReloadPolicy reloads the ACL policy from its configured source and
+// pushes the resulting changes to connected nodes. It does nothing when no
+// policy is configured.
+func (h *Headscale) ReloadPolicy() error {
+	if h.cfg.Policy.IsEmpty() {
+		return nil
+	}
+
+	changes, err := h.state.ReloadPolicy()
+	if err != nil {
+		return fmt.Errorf("reloading policy: %w", err)
+	}
+
+	h.Change(changes...)
+
+	return nil
 }
 
 // tlsBundle carries the TLS settings produced by getTLSSettings. When
