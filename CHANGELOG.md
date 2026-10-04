@@ -60,6 +60,24 @@ removed on this schedule:
 
 [#3352](https://github.com/juanfont/headscale/pull/3352)
 
+### NixOS test kit
+
+Projects built on Tailscale, such as tsnet services, tailscaled integrations or
+Tailscale client implementations, can now test against a real control server
+in their NixOS VM tests. Import `nixosModules.testkit` on a node named
+`headscale`. Clients join `http://headscale` with no certificates or other
+setup, and `hs-authkey USER` on that node mints their auth keys.
+`nixosModules.testkit-peer` adds a tailscaled peer that joins with `hs-join KEY`:
+
+```nix
+nodes.headscale.imports = [ inputs.headscale.nixosModules.testkit ];
+nodes.peer.imports = [ inputs.headscale.nixosModules.testkit-peer ];
+# testScript: peer.succeed(f"hs-join {headscale.succeed('hs-authkey alice').strip()}")
+```
+
+See `nix/README.md` for the full contract, recipes for tsnet and non-Go
+clients, and how to run the same setup without Nix.
+
 ### BREAKING
 
 #### Database
@@ -76,10 +94,21 @@ removed on this schedule:
 - Errors that previously returned HTTP 500 — unknown users or nodes, malformed input, duplicate names — now return the correct 404, 400 or 409 [#3324](https://github.com/juanfont/headscale/pull/3324)
 - The OpenAPI document is OpenAPI 3.1 at `/api/v1/openapi.yaml` (docs at `/api/v1/docs`), replacing Swagger 2.0 at `/swagger` [#3324](https://github.com/juanfont/headscale/pull/3324)
 
+#### Configuration
+
+- `derp.paths` files must end in `.yaml`, `.yml`, `.json` or `.hujson`; the extension picks the format
+- `dns.extra_records_path` must end in `.json`, `.hujson`, `.yaml` or `.yml`; the extension picks the format
+- A `derp.paths` file that decodes to no regions now stops headscale from starting instead of being silently ignored
+
 #### CLI
 
 - `--output json` / `--output yaml` now emit the API's shape — camelCase fields, string-encoded IDs, RFC3339 timestamps — instead of the old Protobuf encoding [#3324](https://github.com/juanfont/headscale/pull/3324)
 - `headscale policy` renames the database-bypass flag from `--bypass-grpc-and-access-database-directly` to `--bypass-server-and-access-database-directly` [#3324](https://github.com/juanfont/headscale/pull/3324)
+
+#### NixOS module
+
+- `settings.ephemeral_node_inactivity_timeout` is removed; set `settings.node.ephemeral.inactivity_timeout`, which headscale reads instead
+- `settings.dns.split` is removed; headscale never read it, set `settings.dns.nameservers.split`
 
 ### Changes
 
@@ -87,7 +116,17 @@ removed on this schedule:
 - Improve systemd service file hardening [#3341](https://github.com/juanfont/headscale/pull/3341)
 - Fix `headscale users destroy`/`rename` reporting "multiple users match query" when no user matches; an ambiguous match now lists the matching users [#3476](https://github.com/juanfont/headscale/pull/3476)
 - Deleting a user that still owns nodes now lists the nodes (ID and hostname) that must be deleted first [#3475](https://github.com/juanfont/headscale/pull/3475)
+- Fix deleted nodes, and peers hidden by a policy change, staying listed in the Tailscale Android app; removed peers are now sent as their own incremental map update [#3492](https://github.com/juanfont/headscale/pull/3492)
+- Policy changes no longer resend DNS configuration to every node, sparing clients a full netmap rebuild; a node gets its DNS configuration when its own NextDNS nodeAttrs, tags or hostname change, which also fixes NextDNS device metadata going stale after a hostname change [#3492](https://github.com/juanfont/headscale/pull/3492)
 - Headscale now requires Go 1.27 to build
+- `headscale preauthkeys create --user` accepts a user name as well as an ID
+- `derp.paths` files may be Tailscale JSON or HuJSON DERP maps as well as YAML
+- `dns.extra_records_path` files may be HuJSON or YAML as well as JSON
+- A `derp.paths` region set to `null` removes that region again, as documented
+- Lower CPU use on large tailnets when node tags, owners, IPs or routes change [#3501](https://github.com/juanfont/headscale/pull/3501)
+- `headscale nodes backfillips` now sends the new IPs to connected clients [#3501](https://github.com/juanfont/headscale/pull/3501)
+- Fix packet filters under `autogroup:self` not updating after a user is added or renamed [#3501](https://github.com/juanfont/headscale/pull/3501)
+- Fix a rejected policy leaving its packet filter active [#3501](https://github.com/juanfont/headscale/pull/3501)
 
 ## 0.29.4 (2026-09-23)
 
