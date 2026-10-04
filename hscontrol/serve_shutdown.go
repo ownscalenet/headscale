@@ -126,6 +126,10 @@ func (r *serveResources) shutdown(ctx context.Context, cancel context.CancelFunc
 		r.socketListener.Close()
 	}
 
+	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
+		provider.Close()
+	}
+
 	info("closing state and database")
 
 	err := h.state.Close()
