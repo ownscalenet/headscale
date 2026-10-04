@@ -118,6 +118,11 @@ func NewAuthProviderOIDC(
 	}, nil
 }
 
+// Close stops the auth cache's cleanup goroutine.
+func (a *AuthProviderOIDC) Close() {
+	a.authCache.Close()
+}
+
 // cookiesSecure reports whether the OIDC cookies should carry the Secure flag.
 // It keys off the configured server_url scheme, not req.TLS, so cookies stay
 // Secure behind a TLS-terminating reverse proxy (where the proxy→Headscale hop
