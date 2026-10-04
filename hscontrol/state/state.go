@@ -306,6 +306,9 @@ func NewState(cfg *types.Config) (*State, error) {
 func (s *State) Close() error {
 	s.pings.drain()
 	s.nodeStore.Stop()
+	// Purge finishes pending auth requests; Close stops the cache's cleanup goroutine.
+	s.authCache.Purge()
+	s.authCache.Close()
 
 	err := s.db.Close()
 	if err != nil {

@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -614,4 +616,51 @@ func TestRouterMethodNotAllowedIncludesAllow(t *testing.T) {
 
 	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 	assert.Equal(t, []string{http.MethodGet}, resp.Header.Values("Allow"))
+}
+
+// TestAuthProviderOIDCCloseStopsAuthCache proves Close stops the auth
+// cache's cleanup goroutine, which otherwise outlives the provider.
+func TestAuthProviderOIDCCloseStopsAuthCache(t *testing.T) {
+	idp, err := mockoidc.Run()
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = idp.Shutdown() })
+
+	app := createTestApp(t)
+	before := countExpirableGoroutines()
+
+	provider, err := NewAuthProviderOIDC(
+		context.Background(),
+		app,
+		"http://hs.example.com",
+		&types.OIDCConfig{
+			Issuer:       idp.Issuer(),
+			ClientID:     idp.ClientID,
+			ClientSecret: idp.ClientSecret,
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, before+1, countExpirableGoroutines())
+
+	provider.Close()
+
+	require.Eventually(t, func() bool {
+		return countExpirableGoroutines() == before
+	}, time.Second, 10*time.Millisecond)
+}
+
+// countExpirableGoroutines returns how many expirable LRU cleanup
+// goroutines are running.
+func countExpirableGoroutines() int {
+	buf := make([]byte, 1<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+
+	n := 0
+	for g := range strings.SplitSeq(string(buf), "\n\n") {
+		if strings.Contains(g, "golang-lru/v2/expirable.") {
+			n++
+		}
+	}
+
+	return n
 }

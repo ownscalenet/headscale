@@ -646,6 +646,10 @@ func (h *Headscale) Serve(ctx context.Context) error {
 			socketListener.Close()
 		}
 
+		if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
+			provider.Close()
+		}
+
 		info("closing state and database")
 
 		err := h.state.Close()
