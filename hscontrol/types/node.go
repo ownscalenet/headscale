@@ -403,9 +403,20 @@ func (node *Node) canAccess(
 	srcRoutes, dstRoutes []netip.Prefix,
 	dstIsExit bool,
 ) bool {
-	src := node.IPs()
-	allowedIPs := node2.IPs()
+	return CanAccessAddrs(
+		matchers, node.IPs(), srcRoutes, node2.IPs(), dstRoutes, dstIsExit,
+	)
+}
 
+// CanAccessAddrs is [Node.CanAccess] on precomputed addresses and routes.
+// The peer-map build calls it for every node pair, so it takes each node's
+// IPs once up front instead of allocating them per call.
+func CanAccessAddrs(
+	matchers []matcher.Match,
+	src []netip.Addr, srcRoutes []netip.Prefix,
+	allowedIPs []netip.Addr, dstRoutes []netip.Prefix,
+	dstIsExit bool,
+) bool {
 	for _, m := range matchers {
 		srcMatchesIP := m.SrcsContainsIPs(src...)
 		srcMatchesRoutes := len(srcRoutes) > 0 && m.SrcsOverlapsPrefixes(srcRoutes...)

@@ -654,16 +654,24 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
-	// Precompute each node's subnet routes and exit-node status once; the
-	// O(n^2) pair scans below would otherwise recompute them for every pair.
-	type nodeRoutes struct {
+	// Precompute each node's IPs, subnet routes and exit-node status once,
+	// indexed by position in nodes; the O(n^2) pair scans below would
+	// otherwise recompute (and allocate) them for every pair.
+	type nodeInfo struct {
+		id     types.NodeID
+		ips    []netip.Addr
 		subnet []netip.Prefix
 		isExit bool
 	}
 
-	routeInfo := make(map[types.NodeID]nodeRoutes, nodes.Len())
-	for _, n := range nodes.All() {
-		routeInfo[n.ID()] = nodeRoutes{subnet: n.SubnetRoutes(), isExit: n.IsExitNode()}
+	info := make([]nodeInfo, nodes.Len())
+	for i, n := range nodes.All() {
+		info[i] = nodeInfo{
+			id:     n.ID(),
+			ips:    n.IPs(),
+			subnet: n.SubnetRoutes(),
+			isExit: n.IsExitNode(),
+		}
 	}
 
 	// If we have a global filter, use it for all nodes (normal case).
@@ -673,17 +681,19 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 		ret := make(map[types.NodeID][]types.NodeID, nodes.Len())
 
 		// Build the map of all peers according to the matchers.
-		for i := range nodes.Len() {
-			for j := i + 1; j < nodes.Len(); j++ {
-				if nodes.At(i).ID() == nodes.At(j).ID() {
+		for i := range info {
+			ri := &info[i]
+
+			for j := i + 1; j < len(info); j++ {
+				rj := &info[j]
+				if ri.id == rj.id {
 					continue
 				}
 
-				ri, rj := routeInfo[nodes.At(i).ID()], routeInfo[nodes.At(j).ID()]
-				if nodes.At(i).CanAccessWithRoutes(pm.matchers, nodes.At(j), ri.subnet, rj.subnet, rj.isExit) ||
-					nodes.At(j).CanAccessWithRoutes(pm.matchers, nodes.At(i), rj.subnet, ri.subnet, ri.isExit) {
-					ret[nodes.At(i).ID()] = append(ret[nodes.At(i).ID()], nodes.At(j).ID())
-					ret[nodes.At(j).ID()] = append(ret[nodes.At(j).ID()], nodes.At(i).ID())
+				if types.CanAccessAddrs(pm.matchers, ri.ips, ri.subnet, rj.ips, rj.subnet, rj.isExit) ||
+					types.CanAccessAddrs(pm.matchers, rj.ips, rj.subnet, ri.ips, ri.subnet, ri.isExit) {
+					ret[ri.id] = append(ret[ri.id], rj.id)
+					ret[rj.id] = append(ret[rj.id], ri.id)
 				}
 			}
 		}
@@ -741,15 +751,13 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	// each other. This matches the global filter path behavior and ensures that
 	// one-way access rules (e.g., admin -> tagged server) still allow both nodes
 	// to see each other as peers, which is required for network connectivity.
-	for i := range nodes.Len() {
-		nodeI := nodes.At(i)
-		matchersI, hasFilterI := nodeMatchers[nodeI.ID()]
-		riI := routeInfo[nodeI.ID()]
+	for i := range info {
+		riI := &info[i]
+		matchersI, hasFilterI := nodeMatchers[riI.id]
 
-		for j := i + 1; j < nodes.Len(); j++ {
-			nodeJ := nodes.At(j)
-			matchersJ, hasFilterJ := nodeMatchers[nodeJ.ID()]
-			riJ := routeInfo[nodeJ.ID()]
+		for j := i + 1; j < len(info); j++ {
+			riJ := &info[j]
+			matchersJ, hasFilterJ := nodeMatchers[riJ.id]
 
 			// Check all access directions for symmetric peer visibility.
 			// For via grants, filter rules exist on the via-designated node
@@ -760,14 +768,13 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 			//      using nodeI's matchers? (reverse direction: the matchers
 			//      on the via node accept traffic FROM the source)
 			// Same for matchersJ in both directions.
-			canIAccessJ := hasFilterI && nodeI.CanAccessWithRoutes(matchersI, nodeJ, riI.subnet, riJ.subnet, riJ.isExit)
-			canJAccessI := hasFilterJ && nodeJ.CanAccessWithRoutes(matchersJ, nodeI, riJ.subnet, riI.subnet, riI.isExit)
-			canJReachI := hasFilterI && nodeJ.CanAccessWithRoutes(matchersI, nodeI, riJ.subnet, riI.subnet, riI.isExit)
-			canIReachJ := hasFilterJ && nodeI.CanAccessWithRoutes(matchersJ, nodeJ, riI.subnet, riJ.subnet, riJ.isExit)
-
-			if canIAccessJ || canJAccessI || canJReachI || canIReachJ {
-				ret[nodeI.ID()] = append(ret[nodeI.ID()], nodeJ.ID())
-				ret[nodeJ.ID()] = append(ret[nodeJ.ID()], nodeI.ID())
+			// The checks short-circuit: one hit makes the pair peers.
+			if (hasFilterI && types.CanAccessAddrs(matchersI, riI.ips, riI.subnet, riJ.ips, riJ.subnet, riJ.isExit)) ||
+				(hasFilterJ && types.CanAccessAddrs(matchersJ, riJ.ips, riJ.subnet, riI.ips, riI.subnet, riI.isExit)) ||
+				(hasFilterI && types.CanAccessAddrs(matchersI, riJ.ips, riJ.subnet, riI.ips, riI.subnet, riI.isExit)) ||
+				(hasFilterJ && types.CanAccessAddrs(matchersJ, riI.ips, riI.subnet, riJ.ips, riJ.subnet, riJ.isExit)) {
+				ret[riI.id] = append(ret[riI.id], riJ.id)
+				ret[riJ.id] = append(ret[riJ.id], riI.id)
 			}
 		}
 	}
