@@ -698,10 +698,41 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	// We need unreduced rules to determine peer relationships correctly.
 	// Reduced rules only show destinations where the node is the target,
 	// but peer relationships require the full bidirectional access rules.
+	//
+	// Without via grants, filterRulesForNode reads the node only through
+	// compileAutogroupSelf (tagged or not, and its user), so nodes sharing
+	// that identity share matchers and are compiled once.
+	type matcherKey struct {
+		user  uint
+		owned bool
+	}
+
+	hasVia := slices.ContainsFunc(pm.compiledGrants, func(cg compiledGrant) bool {
+		return cg.category == grantCategoryVia
+	})
+	byIdentity := make(map[matcherKey][]matcher.Match)
 	nodeMatchers := make(map[types.NodeID][]matcher.Match, nodes.Len())
+
 	for _, node := range nodes.All() {
-		unreduced := pm.filterRulesForNodeLocked(node)
-		nodeMatchers[node.ID()] = matcher.MatchesFromFilterRules(unreduced)
+		if hasVia {
+			unreduced := pm.filterRulesForNodeLocked(node)
+			nodeMatchers[node.ID()] = matcher.MatchesFromFilterRules(unreduced)
+
+			continue
+		}
+
+		var key matcherKey
+		if !node.IsTagged() && node.User().Valid() {
+			key = matcherKey{user: node.User().ID(), owned: true}
+		}
+
+		ms, ok := byIdentity[key]
+		if !ok {
+			ms = matcher.MatchesFromFilterRules(pm.filterRulesForNodeLocked(node))
+			byIdentity[key] = ms
+		}
+
+		nodeMatchers[node.ID()] = ms
 	}
 
 	// Check each node pair for peer relationships.
@@ -820,9 +851,9 @@ func (pm *PolicyManager) FilterForNode(node types.NodeView) ([]tailcfg.FilterRul
 // For global policies: returns the global matchers (same for all nodes)
 // For autogroup:self: returns node-specific matchers from unreduced compiled rules.
 //
-// Per-node results are cached and invalidated on policy/node updates
-// so [PolicyManager.BuildPeerMap]'s O(N²) slow path avoids recomputing
-// matchers for every pair.
+// Per-node results are cached and invalidated on policy/node updates.
+// [PolicyManager.BuildPeerMap] does not use this cache; it memoizes
+// matchers locally per call.
 func (pm *PolicyManager) MatchersForNode(node types.NodeView) ([]matcher.Match, error) {
 	if pm == nil {
 		return nil, nil
