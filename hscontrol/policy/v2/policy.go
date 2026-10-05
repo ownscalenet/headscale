@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math/bits"
 	"net/netip"
 	"slices"
 	"strings"
@@ -637,15 +638,149 @@ func (pm *PolicyManager) Filter() ([]tailcfg.FilterRule, []matcher.Match) {
 	return pm.filter, pm.matchers
 }
 
+// peerNode is a node's snapshot-stable data for peer-map building.
+type peerNode struct {
+	id     types.NodeID
+	ips    []netip.Addr
+	subnet []netip.Prefix
+	isExit bool
+}
+
+// matchesSrc reports whether m's sources cover the node, by IP or by a
+// subnet route it advertises. It is the source half of [types.CanAccessAddrs].
+func (n *peerNode) matchesSrc(m *matcher.Match) bool {
+	return m.SrcsContainsIPs(n.ips...) ||
+		(len(n.subnet) > 0 && m.SrcsOverlapsPrefixes(n.subnet...))
+}
+
+// matchesDst reports whether m's destinations cover the node, by IP, by a
+// subnet route, or as an exit node when m targets the internet. It is the
+// destination half of [types.CanAccessAddrs].
+func (n *peerNode) matchesDst(m *matcher.Match) bool {
+	return m.DestsContainsIP(n.ips...) ||
+		(len(n.subnet) > 0 && m.DestsOverlapsPrefixes(n.subnet...)) ||
+		(n.isExit && m.DestsIsTheInternet())
+}
+
+// nodeSet is a bitset of positions in the node slice being mapped.
+type nodeSet []uint64
+
+func newNodeSet(n int) nodeSet { return make(nodeSet, (n+63)/64) }
+
+func (s nodeSet) set(i int)      { s[i>>6] |= 1 << (uint(i) & 63) }
+func (s nodeSet) has(i int) bool { return s[i>>6]&(1<<(uint(i)&63)) != 0 }
+
+func (s nodeSet) or(o nodeSet) {
+	for k := range s {
+		s[k] |= o[k]
+	}
+}
+
+// each calls fn for every member, in ascending order.
+func (s nodeSet) each(fn func(i int)) {
+	for k, w := range s {
+		for w != 0 {
+			fn(k<<6 + bits.TrailingZeros64(w))
+			w &= w - 1
+		}
+	}
+}
+
+// matcherSides holds, for one matcher, which nodes it matches as a source
+// and as a destination.
+type matcherSides struct {
+	src, dst nodeSet
+}
+
+// matcherGroup is a matcher list shared by one or more nodes, with each
+// matcher's sides computed on first use. Nodes that share a group share
+// that work.
+type matcherGroup struct {
+	matchers []matcher.Match
+	sides    []*matcherSides
+}
+
+func (g *matcherGroup) sidesOf(k int, nodes []peerNode) *matcherSides {
+	if g.sides[k] != nil {
+		return g.sides[k]
+	}
+
+	sd := &matcherSides{src: newNodeSet(len(nodes)), dst: newNodeSet(len(nodes))}
+	for i := range nodes {
+		if nodes[i].matchesSrc(&g.matchers[k]) {
+			sd.src.set(i)
+		}
+
+		if nodes[i].matchesDst(&g.matchers[k]) {
+			sd.dst.set(i)
+		}
+	}
+
+	g.sides[k] = sd
+
+	return sd
+}
+
+func newMatcherGroup(matchers []matcher.Match) *matcherGroup {
+	return &matcherGroup{matchers: matchers, sides: make([]*matcherSides, len(matchers))}
+}
+
+// peersFromRows turns directed reach rows into the symmetric peer map: a pair
+// are peers if either row has the other. Peers come out in node-slice order,
+// each slice allocated at its final size. When skipSameID is set, positions
+// holding the same node ID are not paired.
+func peersFromRows(
+	nodes []peerNode,
+	rows []nodeSet,
+	skipSameID bool,
+) map[types.NodeID][]types.NodeID {
+	adj := make([]nodeSet, len(nodes))
+	for i := range adj {
+		adj[i] = newNodeSet(len(nodes))
+	}
+
+	for i := range rows {
+		rows[i].each(func(j int) {
+			if i == j || (skipSameID && nodes[i].id == nodes[j].id) {
+				return
+			}
+
+			adj[i].set(j)
+			adj[j].set(i)
+		})
+	}
+
+	ret := make(map[types.NodeID][]types.NodeID, len(nodes))
+
+	for i := range adj {
+		count := 0
+
+		for _, w := range adj[i] {
+			count += bits.OnesCount64(w)
+		}
+
+		if count == 0 {
+			continue
+		}
+
+		peers := make([]types.NodeID, 0, count)
+		adj[i].each(func(j int) { peers = append(peers, nodes[j].id) })
+		ret[nodes[i].id] = peers
+	}
+
+	return ret
+}
+
 // BuildPeerMap constructs peer relationship maps for the given nodes.
 // For global filters, it uses the global filter matchers for all nodes.
 // For autogroup:self policies (empty global filter), it builds per-node
 // peer maps using each node's specific filter rules.
 //
-// Compared to [policy.ReduceNodes], which builds the list per node, we end
-// up with doing the full work for every node O(n^2), while this will reduce
-// the list as we see relationships while building the map, making it
-// O(n^2/2) in the end, but with less work per node.
+// Rather than testing every node pair against every matcher, it inverts the
+// question: for each matcher it finds which nodes match as a source and
+// which as a destination (O(n) per matcher), then ORs the destination set
+// into each source node's row. The work is O(n x matchers) set lookups plus
+// O(n^2/64) word operations, with the output size as the only quadratic term.
 func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[types.NodeID][]types.NodeID {
 	if pm == nil {
 		return nil
@@ -655,18 +790,10 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	defer pm.mu.RUnlock()
 
 	// Precompute each node's IPs, subnet routes and exit-node status once,
-	// indexed by position in nodes; the O(n^2) pair scans below would
-	// otherwise recompute (and allocate) them for every pair.
-	type nodeInfo struct {
-		id     types.NodeID
-		ips    []netip.Addr
-		subnet []netip.Prefix
-		isExit bool
-	}
-
-	info := make([]nodeInfo, nodes.Len())
+	// indexed by position in nodes.
+	info := make([]peerNode, nodes.Len())
 	for i, n := range nodes.All() {
-		info[i] = nodeInfo{
+		info[i] = peerNode{
 			id:     n.ID(),
 			ips:    n.IPs(),
 			subnet: n.SubnetRoutes(),
@@ -674,36 +801,29 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 		}
 	}
 
+	rows := make([]nodeSet, len(info))
+	for i := range rows {
+		rows[i] = newNodeSet(len(info))
+	}
+
 	// If we have a global filter, use it for all nodes (normal case).
 	// Via grants require the per-node path because the global filter
 	// skips via grants (compileFilterRules: if len(grant.Via) > 0 { continue }).
 	if !pm.needsPerNodeFilter {
-		ret := make(map[types.NodeID][]types.NodeID, nodes.Len())
+		g := newMatcherGroup(pm.matchers)
 
-		// Build the map of all peers according to the matchers.
-		for i := range info {
-			ri := &info[i]
-
-			for j := i + 1; j < len(info); j++ {
-				rj := &info[j]
-				if ri.id == rj.id {
-					continue
-				}
-
-				if types.CanAccessAddrs(pm.matchers, ri.ips, ri.subnet, rj.ips, rj.subnet, rj.isExit) ||
-					types.CanAccessAddrs(pm.matchers, rj.ips, rj.subnet, ri.ips, ri.subnet, ri.isExit) {
-					ret[ri.id] = append(ret[ri.id], rj.id)
-					ret[rj.id] = append(ret[rj.id], ri.id)
-				}
-			}
+		// A node that matches as a source reaches every node that matches
+		// as a destination; peers are symmetric, so one direction suffices.
+		for k := range g.matchers {
+			sd := g.sidesOf(k, info)
+			sd.src.each(func(i int) { rows[i].or(sd.dst) })
 		}
 
-		return ret
+		return peersFromRows(info, rows, true)
 	}
 
-	// For autogroup:self or via grants, build per-node peer relationships
-	ret := make(map[types.NodeID][]types.NodeID, nodes.Len())
-
+	// For autogroup:self or via grants, build per-node peer relationships.
+	//
 	// Pre-compute per-node matchers using unreduced compiled rules
 	// We need unreduced rules to determine peer relationships correctly.
 	// Reduced rules only show destinations where the node is the target,
@@ -711,7 +831,7 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	//
 	// Without via grants, filterRulesForNode reads the node only through
 	// compileAutogroupSelf (tagged or not, and its user), so nodes sharing
-	// that identity share matchers and are compiled once.
+	// that identity share a matcher group and are compiled once.
 	type matcherKey struct {
 		user  uint
 		owned bool
@@ -720,13 +840,14 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	hasVia := slices.ContainsFunc(pm.compiledGrants, func(cg compiledGrant) bool {
 		return cg.category == grantCategoryVia
 	})
-	byIdentity := make(map[matcherKey][]matcher.Match)
-	nodeMatchers := make(map[types.NodeID][]matcher.Match, nodes.Len())
+	byIdentity := make(map[matcherKey]*matcherGroup)
+	groups := make([]*matcherGroup, len(info))
 
-	for _, node := range nodes.All() {
+	for i, node := range nodes.All() {
 		if hasVia {
-			unreduced := pm.filterRulesForNodeLocked(node)
-			nodeMatchers[node.ID()] = matcher.MatchesFromFilterRules(unreduced)
+			groups[i] = newMatcherGroup(
+				matcher.MatchesFromFilterRules(pm.filterRulesForNodeLocked(node)),
+			)
 
 			continue
 		}
@@ -736,50 +857,44 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 			key = matcherKey{user: node.User().ID(), owned: true}
 		}
 
-		ms, ok := byIdentity[key]
+		g, ok := byIdentity[key]
 		if !ok {
-			ms = matcher.MatchesFromFilterRules(pm.filterRulesForNodeLocked(node))
-			byIdentity[key] = ms
+			g = newMatcherGroup(
+				matcher.MatchesFromFilterRules(pm.filterRulesForNodeLocked(node)),
+			)
+			byIdentity[key] = g
 		}
 
-		nodeMatchers[node.ID()] = ms
+		groups[i] = g
 	}
 
-	// Check each node pair for peer relationships.
-	// Start j at i+1 to avoid checking the same pair twice and creating duplicates.
 	// We use symmetric visibility: if EITHER node can access the other, BOTH see
 	// each other. This matches the global filter path behavior and ensures that
 	// one-way access rules (e.g., admin -> tagged server) still allow both nodes
 	// to see each other as peers, which is required for network connectivity.
+	//
+	// A node's matchers decide its own peers in both directions. For via
+	// grants, filter rules exist on the via-designated node (e.g., router-a)
+	// with sources being the client (group-a), so for each matcher of node o:
+	//   - if o is a source, every destination node is a peer of o;
+	//   - if o is a destination, every source node is a peer of o.
 	for i := range info {
-		riI := &info[i]
-		matchersI, hasFilterI := nodeMatchers[riI.id]
+		g := groups[i]
+		for k := range g.matchers {
+			m := &g.matchers[k]
 
-		for j := i + 1; j < len(info); j++ {
-			riJ := &info[j]
-			matchersJ, hasFilterJ := nodeMatchers[riJ.id]
+			inSrc, inDst := info[i].matchesSrc(m), info[i].matchesDst(m)
+			if inSrc {
+				rows[i].or(g.sidesOf(k, info).dst)
+			}
 
-			// Check all access directions for symmetric peer visibility.
-			// For via grants, filter rules exist on the via-designated node
-			// (e.g., router-a) with sources being the client (group-a).
-			// We need to check BOTH:
-			//   1. nodeI.CanAccess(matchersI, nodeJ) — can nodeI reach nodeJ?
-			//   2. nodeJ.CanAccess(matchersI, nodeI) — can nodeJ reach nodeI
-			//      using nodeI's matchers? (reverse direction: the matchers
-			//      on the via node accept traffic FROM the source)
-			// Same for matchersJ in both directions.
-			// The checks short-circuit: one hit makes the pair peers.
-			if (hasFilterI && types.CanAccessAddrs(matchersI, riI.ips, riI.subnet, riJ.ips, riJ.subnet, riJ.isExit)) ||
-				(hasFilterJ && types.CanAccessAddrs(matchersJ, riJ.ips, riJ.subnet, riI.ips, riI.subnet, riI.isExit)) ||
-				(hasFilterI && types.CanAccessAddrs(matchersI, riJ.ips, riJ.subnet, riI.ips, riI.subnet, riI.isExit)) ||
-				(hasFilterJ && types.CanAccessAddrs(matchersJ, riI.ips, riI.subnet, riJ.ips, riJ.subnet, riJ.isExit)) {
-				ret[riI.id] = append(ret[riI.id], riJ.id)
-				ret[riJ.id] = append(ret[riJ.id], riI.id)
+			if inDst {
+				rows[i].or(g.sidesOf(k, info).src)
 			}
 		}
 	}
 
-	return ret
+	return peersFromRows(info, rows, false)
 }
 
 // filterRulesForNodeLocked returns the unreduced compiled filter rules
