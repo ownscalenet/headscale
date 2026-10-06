@@ -167,12 +167,12 @@ func TestConfigToURL(t *testing.T) {
 		{
 			name:   "default config includes txlock immediate",
 			config: Default("/path/to/db.sqlite"),
-			want:   "file:/path/to/db.sqlite?_txlock=immediate&_pragma=busy_timeout=10000&_pragma=journal_mode=WAL&_pragma=auto_vacuum=INCREMENTAL&_pragma=wal_autocheckpoint=1000&_pragma=synchronous=NORMAL&_pragma=foreign_keys=ON",
+			want:   "file:/path/to/db.sqlite?_txlock=immediate&_pragma=busy_timeout=10000&_pragma=journal_mode=WAL&_pragma=auto_vacuum=INCREMENTAL&_pragma=wal_autocheckpoint=1000&_pragma=synchronous=NORMAL&_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 		{
 			name:   "memory config",
 			config: Memory(),
-			want:   ":memory:?_pragma=foreign_keys=ON",
+			want:   ":memory:?_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 		{
 			name: "minimal config",
@@ -180,7 +180,7 @@ func TestConfigToURL(t *testing.T) {
 				Path:              "/simple/db.sqlite",
 				WALAutocheckpoint: -1, // not set
 			},
-			want: "file:/simple/db.sqlite",
+			want: "file:/simple/db.sqlite?_time_format=sqlite",
 		},
 		{
 			name: "custom config",
@@ -192,7 +192,7 @@ func TestConfigToURL(t *testing.T) {
 				Synchronous:       SynchronousFull,
 				ForeignKeys:       true,
 			},
-			want: "file:/custom/db.sqlite?_pragma=busy_timeout=5000&_pragma=journal_mode=DELETE&_pragma=synchronous=FULL&_pragma=foreign_keys=ON",
+			want: "file:/custom/db.sqlite?_pragma=busy_timeout=5000&_pragma=journal_mode=DELETE&_pragma=synchronous=FULL&_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 		{
 			name: "memory with custom timeout",
@@ -202,7 +202,7 @@ func TestConfigToURL(t *testing.T) {
 				WALAutocheckpoint: -1, // not set
 				ForeignKeys:       true,
 			},
-			want: ":memory:?_pragma=busy_timeout=2000&_pragma=foreign_keys=ON",
+			want: ":memory:?_pragma=busy_timeout=2000&_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 		{
 			name: "wal autocheckpoint zero",
@@ -210,7 +210,7 @@ func TestConfigToURL(t *testing.T) {
 				Path:              "/test.db",
 				WALAutocheckpoint: 0,
 			},
-			want: "file:/test.db?_pragma=wal_autocheckpoint=0",
+			want: "file:/test.db?_pragma=wal_autocheckpoint=0&_time_format=sqlite",
 		},
 		{
 			name: "all options",
@@ -223,7 +223,7 @@ func TestConfigToURL(t *testing.T) {
 				Synchronous:       SynchronousExtra,
 				ForeignKeys:       true,
 			},
-			want: "file:/full.db?_pragma=busy_timeout=15000&_pragma=journal_mode=WAL&_pragma=auto_vacuum=FULL&_pragma=wal_autocheckpoint=1000&_pragma=synchronous=EXTRA&_pragma=foreign_keys=ON",
+			want: "file:/full.db?_pragma=busy_timeout=15000&_pragma=journal_mode=WAL&_pragma=auto_vacuum=FULL&_pragma=wal_autocheckpoint=1000&_pragma=synchronous=EXTRA&_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 		{
 			name: "with txlock immediate",
@@ -234,7 +234,7 @@ func TestConfigToURL(t *testing.T) {
 				WALAutocheckpoint: -1,
 				ForeignKeys:       true,
 			},
-			want: "file:/test.db?_txlock=immediate&_pragma=busy_timeout=5000&_pragma=foreign_keys=ON",
+			want: "file:/test.db?_txlock=immediate&_pragma=busy_timeout=5000&_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 		{
 			name: "with txlock deferred",
@@ -244,7 +244,7 @@ func TestConfigToURL(t *testing.T) {
 				WALAutocheckpoint: -1,
 				ForeignKeys:       true,
 			},
-			want: "file:/test.db?_txlock=deferred&_pragma=foreign_keys=ON",
+			want: "file:/test.db?_txlock=deferred&_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 		{
 			name: "with txlock exclusive",
@@ -253,7 +253,7 @@ func TestConfigToURL(t *testing.T) {
 				TxLock:            TxLockExclusive,
 				WALAutocheckpoint: -1,
 			},
-			want: "file:/test.db?_txlock=exclusive",
+			want: "file:/test.db?_txlock=exclusive&_time_format=sqlite",
 		},
 		{
 			name: "empty txlock omitted from URL",
@@ -264,7 +264,7 @@ func TestConfigToURL(t *testing.T) {
 				WALAutocheckpoint: -1,
 				ForeignKeys:       true,
 			},
-			want: "file:/test.db?_pragma=busy_timeout=1000&_pragma=foreign_keys=ON",
+			want: "file:/test.db?_pragma=busy_timeout=1000&_pragma=foreign_keys=ON&_time_format=sqlite",
 		},
 	}
 

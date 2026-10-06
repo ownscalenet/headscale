@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
@@ -325,5 +326,44 @@ func TestToURLOpensExactPath(t *testing.T) {
 			_, err = ro.ExecContext(t.Context(), "INSERT INTO t VALUES (1)")
 			require.ErrorContains(t, err, "readonly")
 		})
+	}
+}
+
+// TestTimeFormat verifies that time.Time values are written in the format
+// headscale databases were created with, not time.Time.String().
+func TestTimeFormat(t *testing.T) {
+	url, err := Default(filepath.Join(t.TempDir(), "time.db")).ToURL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, "CREATE TABLE t (at DATETIME)"); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 10, 6, 12, 30, 45, 123000000, time.FixedZone("", 2*60*60))
+	if _, err := db.ExecContext(ctx, "INSERT INTO t (at) VALUES (?)", at); err != nil {
+		t.Fatal(err)
+	}
+
+	var raw string
+	if err := db.QueryRowContext(ctx, "SELECT CAST(at AS TEXT) FROM t").Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	if want := "2026-10-06 12:30:45.123+02:00"; raw != want {
+		t.Errorf("stored time = %q, want %q", raw, want)
+	}
+
+	var got time.Time
+	if err := db.QueryRowContext(ctx, "SELECT at FROM t").Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !got.Equal(at) {
+		t.Errorf("read time = %v, want %v", got, at)
 	}
 }

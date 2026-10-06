@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/go-gormigrate/gormigrate/v2"
+	"github.com/juanfont/headscale/hscontrol/db/gormsqlite"
 	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -304,7 +304,7 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 
 					return tx.Transaction(func(tx *gorm.DB) error {
 						colType := "numeric"
-						if tx.Name() != sqlite.DriverName {
+						if tx.Name() != gormsqlite.DriverName {
 							colType = "boolean"
 						}
 
@@ -341,7 +341,7 @@ WHERE auth_key_id IN (
 						}
 
 						colType := "numeric"
-						if tx.Name() != sqlite.DriverName {
+						if tx.Name() != gormsqlite.DriverName {
 							colType = "boolean"
 						}
 
@@ -542,7 +542,7 @@ func openDB(cfg types.DatabaseConfig, sqlitePath string) (*gorm.DB, error) {
 		// it waits for preparation, deadlocking both callers. The regression
 		// test TestSQLiteSameQueryInAndOutsideTransaction covers this ordering.
 		db, err := gorm.Open(
-			sqlite.Open(connectionURL),
+			gormsqlite.Open(connectionURL),
 			&gorm.Config{
 				Logger: dbLogger,
 			},
