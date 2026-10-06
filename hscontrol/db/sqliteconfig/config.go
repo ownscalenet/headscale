@@ -390,6 +390,10 @@ func (c *Config) ToURL() (string, error) {
 		queryParts = append(queryParts, "_pragma=foreign_keys=ON")
 	}
 
+	// modernc.org/sqlite writes time.Time as time.Time.String() by default;
+	// keep the format headscale databases were written with.
+	queryParts = append(queryParts, "_time_format=sqlite")
+
 	if len(queryParts) > 0 {
 		baseURL += "?" + strings.Join(queryParts, "&")
 	}
