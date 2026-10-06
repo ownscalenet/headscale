@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
+	"github.com/juanfont/headscale/hscontrol/db/gormsqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -264,7 +264,7 @@ func TestCheckVersionUpgradePath_CurrentPseudoDoesNotPoison(t *testing.T) {
 func versionTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	db, err := gorm.Open(gormsqlite.Open("file::memory:"), &gorm.Config{})
 	require.NoError(t, err)
 
 	err = ensureDatabaseVersionTable(db)
@@ -299,7 +299,7 @@ func TestSetAndGetDatabaseVersion(t *testing.T) {
 }
 
 func TestEnsureDatabaseVersionTableIdempotent(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	db, err := gorm.Open(gormsqlite.Open("file::memory:"), &gorm.Config{})
 	require.NoError(t, err)
 
 	// Call twice — should not error
@@ -527,7 +527,7 @@ func TestCheckMinimumMigration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+			db, err := gorm.Open(gormsqlite.Open("file::memory:"), &gorm.Config{})
 			require.NoError(t, err)
 
 			if tt.ids != nil {

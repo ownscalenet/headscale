@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/go-gormigrate/gormigrate/v2"
+	"github.com/juanfont/headscale/hscontrol/db/gormsqlite"
 	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -440,7 +440,7 @@ func openDB(cfg types.DatabaseConfig) (*gorm.DB, error) {
 		}
 
 		db, err := gorm.Open(
-			sqlite.Open(connectionURL),
+			gormsqlite.Open(connectionURL),
 			&gorm.Config{
 				PrepareStmt: cfg.Gorm.PrepareStmt,
 				Logger:      dbLogger,

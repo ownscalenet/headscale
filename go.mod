@@ -14,7 +14,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/glebarez/sqlite v1.11.0
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-chi/metrics v0.1.1
 	github.com/go-gormigrate/gormigrate/v2 v2.1.7
@@ -131,7 +130,6 @@ require (
 	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/gaissmai/bart v0.26.1 // indirect
-	github.com/glebarez/go-sqlite v1.22.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.5 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
