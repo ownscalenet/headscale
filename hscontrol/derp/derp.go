@@ -153,7 +153,7 @@ func shuffleDERPMap(dm *tailcfg.DERPMap) {
 			continue
 		}
 
-		derpRandom().Shuffle(len(region.Nodes), reflect.Swapper(region.Nodes))
+		shuffleWithDerpRandomLock(len(region.Nodes), reflect.Swapper(region.Nodes))
 	}
 }
 
