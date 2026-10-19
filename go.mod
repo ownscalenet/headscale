@@ -26,6 +26,7 @@ require (
 	github.com/kradalby/libdns-gigahost v0.0.0-20261014145029-4c03bc63b974
 	github.com/letsencrypt/pebble/v2 v2.10.1
 	github.com/libdns/acmedns v0.5.0
+	github.com/libdns/azure v0.5.0
 	github.com/libdns/cloudflare v0.2.2
 	github.com/libdns/hetzner/v2 v2.0.1
 	github.com/libdns/libdns v1.1.1
@@ -94,7 +95,12 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	fyne.io/systray v1.12.2 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dns/armdns v1.2.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2 // indirect
 	github.com/Kodeworks/golang-image-ico v0.0.0-20141118225523-73f0f4cfade9 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
@@ -177,6 +183,7 @@ require (
 	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/kradalby/gigahost-go/client v0.0.0-20261014144355-025b38b667ed // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/letsencrypt/challtestsrv v1.4.2 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
@@ -203,6 +210,7 @@ require (
 	github.com/peterbourgon/ff/v3 v3.4.0 // indirect
 	github.com/petermattis/goid v0.0.0-20260330135022-df67b199bc81 // indirect
 	github.com/pires/go-proxyproto v0.15.0 // indirect
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
