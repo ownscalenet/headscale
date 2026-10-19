@@ -17,6 +17,7 @@ import (
 
 	gigahost "github.com/kradalby/libdns-gigahost"
 	"github.com/libdns/acmedns"
+	"github.com/libdns/azure"
 	"github.com/libdns/cloudflare"
 	"github.com/libdns/hetzner/v2"
 	"github.com/libdns/libdns"
@@ -191,6 +192,24 @@ func TestNewProvider(t *testing.T) {
 			provider: "gigahost",
 			settings: map[string]any{"api_key": "file:" + secret},
 			want:     &gigahost.Provider{APIKey: "from-file"},
+		},
+		{
+			name:     "azure",
+			provider: "azure",
+			settings: map[string]any{
+				"subscription_id":     "sub",
+				"resource_group_name": "rg",
+				"tenant_id":           "tenant",
+				"client_id":           "client",
+				"client_secret":       "file:" + secret,
+			},
+			want: &azure.Provider{
+				SubscriptionId:    "sub",
+				ResourceGroupName: "rg",
+				TenantId:          "tenant",
+				ClientId:          "client",
+				ClientSecret:      "from-file",
+			},
 		},
 		{
 			name:     "hetzner",

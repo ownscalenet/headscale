@@ -17,6 +17,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	gigahost "github.com/kradalby/libdns-gigahost"
 	"github.com/libdns/acmedns"
+	"github.com/libdns/azure"
 	"github.com/libdns/cloudflare"
 	"github.com/libdns/hetzner/v2"
 	"github.com/libdns/libdns"
@@ -63,6 +64,7 @@ var providers = map[string]struct {
 	// validate checks the accounts.
 	"acmedns": {build: func() Provider { return &acmeDNS{served: make(map[string][2]acmeDNSValue)} }},
 	// api_token authenticates writes; zone_token only zone lookups.
+	"azure":      {build: func() Provider { return new(azure.Provider) }},
 	"cloudflare": {build: func() Provider { return new(cloudflare.Provider) }, required: []string{"api_token"}},
 	"gigahost":   {build: func() Provider { return new(gigahost.Provider) }, required: []string{"api_key"}},
 	"hetzner": {
