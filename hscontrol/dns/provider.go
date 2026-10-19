@@ -16,6 +16,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	gigahost "github.com/kradalby/libdns-gigahost"
 	"github.com/libdns/acmedns"
+	"github.com/libdns/azure"
 	"github.com/libdns/cloudflare"
 	"github.com/libdns/hetzner/v2"
 	"github.com/libdns/libdns"
@@ -52,6 +53,7 @@ type Provider interface {
 // dependency to keep current and its quirks become ours.
 var providers = map[string]func() Provider{
 	"acmedns":    func() Provider { return &acmeDNS{served: make(map[string][2]acmeDNSValue)} },
+	"azure":      func() Provider { return new(azure.Provider) },
 	"cloudflare": func() Provider { return new(cloudflare.Provider) },
 	"gigahost":   func() Provider { return new(gigahost.Provider) },
 	"hetzner":    func() Provider { return new(hetzner.Provider) },
