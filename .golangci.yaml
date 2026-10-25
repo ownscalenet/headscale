@@ -115,6 +115,7 @@ linters:
       - builtin$
       - examples$
       - gen
+      - hscontrol/db/gormsqlite
 
 formatters:
   enable:
@@ -129,3 +130,4 @@ formatters:
       - builtin$
       - examples$
       - gen
+      - hscontrol/db/gormsqlite
