@@ -246,9 +246,12 @@ func NewPolicyManager(b []byte, users []types.User, nodes views.Slice[types.Node
 // pm is written, so a caller that restores its own input on error leaves pm
 // as it was, and a retry with the same input recompiles.
 func (pm *PolicyManager) updateLocked() (bool, error) {
+	// One tag index serves every resolution in this compile.
+	pol := pm.pol.withNodesByTag(pm.nodes)
+
 	// Compile all grants once. Both global and per-node filter
 	// rules are derived from these compiled grants.
-	grants := pm.pol.compileGrants(pm.users, pm.nodes)
+	grants := pol.compileGrants(pm.users, pm.nodes)
 
 	relayTargetIPs, err := collectRelayTargetIPs(grants)
 	if err != nil {
@@ -258,12 +261,12 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	// Order matters, tags might be used in autoapprovers, so we need to ensure
 	// that the map for tag owners is resolved before resolving autoapprovers.
 	// TODO(kradalby): Order might not matter after #2417
-	tagMap, err := resolveTagOwners(pm.pol, pm.users, pm.nodes)
+	tagMap, err := resolveTagOwners(pol, pm.users, pm.nodes)
 	if err != nil {
 		return false, fmt.Errorf("resolving tag owners map: %w", err)
 	}
 
-	autoMap, exitSet, err := resolveAutoApprovers(pm.pol, pm.users, pm.nodes)
+	autoMap, exitSet, err := resolveAutoApprovers(pol, pm.users, pm.nodes)
 	if err != nil {
 		return false, fmt.Errorf("resolving auto approvers map: %w", err)
 	}
@@ -279,7 +282,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 
 	var nodeAttrs map[types.NodeID]tailcfg.NodeCapMap
 	if refreshNodeAttrs {
-		nodeAttrs, err = pm.pol.compileNodeAttrs(pm.users, pm.nodes)
+		nodeAttrs, err = pol.compileNodeAttrs(pm.users, pm.nodes)
 		if err != nil {
 			return false, fmt.Errorf("compiling nodeAttrs: %w", err)
 		}
@@ -2068,10 +2071,9 @@ func (pm *PolicyManager) refreshNodeAttrsLocked(newMap map[types.NodeID]tailcfg.
 	}
 }
 
-// NodeCapMap returns the policy-derived CapMap for the given node, or
-// nil when the node has no nodeAttrs entries that target it. The
-// returned map is a defensive clone — caller mutations cannot reach
-// the manager-owned cache.
+// NodeCapMap returns compiled policy capabilities for the given node, or nil
+// when none target it. The map is a defensive clone; its values are shared
+// and read-only.
 func (pm *PolicyManager) NodeCapMap(id types.NodeID) tailcfg.NodeCapMap {
 	if pm == nil {
 		return nil
@@ -2091,11 +2093,9 @@ func (pm *PolicyManager) NodeCapMap(id types.NodeID) tailcfg.NodeCapMap {
 	return out
 }
 
-// NodeCapMaps returns a snapshot of the per-node policy CapMap. The
-// mapper calls this once per request to amortise lock acquisitions
-// over a peer-loop instead of taking the lock per peer. The returned
-// map is a fresh container; the inner [tailcfg.NodeCapMap] values are
-// shared with the manager and must be treated as read-only.
+// NodeCapMaps snapshots every node's policy CapMap. The outer map is
+// caller-owned; inner maps are shared with the manager and read-only.
+// NodeCapMapsForPeers limits copying when fewer peers are requested.
 func (pm *PolicyManager) NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap {
 	if pm == nil {
 		return nil
@@ -2106,6 +2106,36 @@ func (pm *PolicyManager) NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap {
 
 	out := make(map[types.NodeID]tailcfg.NodeCapMap, len(pm.nodeAttrsMap))
 	maps.Copy(out, pm.nodeAttrsMap)
+
+	return out
+}
+
+// NodeCapMapsForPeers snapshots requested peer caps under one lock. It may
+// include unselected entries when copying the whole compiled table is less work.
+// The outer map is caller-owned; inner maps are shared and read-only.
+// Empty selections or no compiled policy capabilities return nil; missing IDs read nil.
+func (pm *PolicyManager) NodeCapMapsForPeers(peers views.Slice[types.NodeView]) map[types.NodeID]tailcfg.NodeCapMap {
+	if pm == nil || peers.Len() == 0 {
+		return nil
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	if len(pm.nodeAttrsMap) == 0 {
+		return nil
+	}
+
+	out := make(map[types.NodeID]tailcfg.NodeCapMap, min(peers.Len(), len(pm.nodeAttrsMap)))
+	if peers.Len() >= len(pm.nodeAttrsMap) {
+		maps.Copy(out, pm.nodeAttrsMap)
+	} else {
+		for _, peer := range peers.All() {
+			if caps, ok := pm.nodeAttrsMap[peer.ID()]; ok {
+				out[peer.ID()] = caps
+			}
+		}
+	}
 
 	return out
 }

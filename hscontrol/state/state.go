@@ -223,14 +223,6 @@ func NewState(cfg *types.Config) (*State, error) {
 		cacheMaxEntries = cfg.Tuning.RegisterCacheMaxEntries
 	}
 
-	authCache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
-		cacheMaxEntries,
-		func(id types.AuthID, rn *types.AuthRequest) {
-			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
-		},
-		cacheExpiration,
-	)
-
 	db, err := hsdb.NewHeadscaleDatabase(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing database: %w", err)
@@ -275,6 +267,15 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	nodeStore := NewNodeStore(nodes, policyPeersFunc(polMan), batchSize, batchTimeout)
 	nodeStore.Start()
+
+	// Last: NewLRU starts the TTL sweeper goroutine, which only Close stops.
+	authCache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
+		cacheMaxEntries,
+		func(id types.AuthID, rn *types.AuthRequest) {
+			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
+		},
+		cacheExpiration,
+	)
 
 	s := &State{
 		cfg: cfg,
@@ -327,7 +328,8 @@ func policyPeersFunc(pm policy.PolicyManager) PeersFunc {
 func (s *State) Close() error {
 	s.pings.drain()
 	s.nodeStore.Stop()
-	// Purge finishes pending auth requests; Close stops the cache's cleanup goroutine.
+	// Purge before Close: Close stops the sweeper, so anything still cached
+	// would never expire and its WaitForAuth caller would hang.
 	s.authCache.Purge()
 	s.authCache.Close()
 
@@ -630,17 +632,18 @@ func (s *State) DeleteNode(node types.NodeView) ([]change.Change, error) {
 	s.persistMu.Lock()
 
 	err := s.db.DeleteNode(node.AsStruct())
-	if err != nil {
-		s.persistMu.Unlock()
+	s.persistMu.Unlock()
 
+	if err != nil {
 		return nil, err
 	}
 
 	// The database is the durable source of truth. Only remove the in-memory
 	// node after its row is gone so a failed database write cannot make a live
-	// node look deleted until the next restart.
+	// node look deleted until the next restart. persistMu stays out of this
+	// write: a persist that still finds the node updates no row, and holding
+	// it would give every concurrent delete a NodeStore batch of its own.
 	s.nodeStore.DeleteNode(node.ID())
-	s.persistMu.Unlock()
 
 	s.ipAlloc.FreeIPs(node.IPs())
 
@@ -1318,6 +1321,12 @@ func (s *State) NodeCapMap(id types.NodeID) tailcfg.NodeCapMap {
 // callers can amortise lock acquisition over a peer loop.
 func (s *State) NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap {
 	return s.polMan.NodeCapMaps()
+}
+
+// NodeCapMapsForPeers returns one policy snapshot containing the requested peer caps.
+// It may include other entries; inner maps are shared and read-only.
+func (s *State) NodeCapMapsForPeers(peers views.Slice[types.NodeView]) map[types.NodeID]tailcfg.NodeCapMap {
+	return s.polMan.NodeCapMapsForPeers(peers)
 }
 
 // NodeCanHaveTag checks if a node is allowed to have a specific tag.
@@ -2772,8 +2781,7 @@ func (s *State) HandleNodeFromPreAuthKey(
 	}
 
 	// Ensure we have valid hostinfo
-	validHostinfo := cmp.Or(regReq.Hostinfo, &tailcfg.Hostinfo{})
-	validHostinfo.Hostname = hostname
+	validHostinfo := cmp.Or(regReq.Hostinfo.Clone(), &tailcfg.Hostinfo{})
 
 	log.Debug().
 		Caller().
@@ -3208,6 +3216,15 @@ func (s *State) DrainSelfRefreshes() []change.Change {
 // have the list already available so it could go much quicker. Alternatively
 // the policy manager could have a remove or add list for nodes.
 func (s *State) updatePolicyManagerNodes(genBefore uint64) (change.Change, error) {
+	// A move since genBefore is the writer applying this write's nodes or a
+	// later batch's, which it hands the policy manager before publishing.
+	// The published snapshot read here can then be older, and SetNodes with
+	// it would recompile the policy back. What is left to do here is retry a
+	// recompile the writer failed, which leaves the generation where it was.
+	if s.polMan.NodesGeneration() != genBefore {
+		return change.PolicyChange(), nil
+	}
+
 	nodes := s.ListNodes()
 
 	changed, err := s.polMan.SetNodes(nodes)
@@ -3507,7 +3524,8 @@ func (s *State) UpdateNodeFromMapRequest(id types.NodeID, req tailcfg.MapRequest
 		currentNode.ApplyPeerChange(&delta.peerChange)
 
 		if hostinfoToStore {
-			currentNode.Hostinfo = newHostinfo
+			// The snapshot outlives the request; deep-copy so its slices and NetInfo are never shared.
+			currentNode.Hostinfo = newHostinfo.Clone()
 		}
 
 		// Only a real hostname change may re-derive GivenName: it is peer
