@@ -61,6 +61,7 @@ jdewinne
 joachimtingvold
 jonathanspw
 joscdk joscdk
+joshuacox joshuacox
 juanfont
 kazauwa
 korfuri
@@ -114,6 +115,7 @@ serhii-matsyshyn
 sfllaw
 shurshun
 slackingveteran
+soymgomez soymgomez
 spymobilfon
 stavros-k
 stblassitude

@@ -232,32 +232,22 @@ func (hsdb *HSDatabase) DeleteNode(node *types.Node) error {
 
 // DeleteNode deletes a [types.Node] from the database.
 // Caller is responsible for notifying all of change.
+// Returns [ErrNodeNotFound] when the row is already gone, so only the call
+// that removed it acts on the deletion.
 func DeleteNode(tx *gorm.DB,
 	node *types.Node,
 ) error {
 	// Unscoped causes the node to be fully removed from the database.
-	err := tx.Unscoped().Delete(&types.Node{}, node.ID).Error
-	if err != nil {
-		return err
+	result := tx.Unscoped().Delete(&types.Node{}, node.ID)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return ErrNodeNotFound
 	}
 
 	return nil
-}
-
-// DeleteEphemeralNode deletes a [types.Node] from the database, note that this method
-// will remove it straight, and not notify any changes or consider any routes.
-// It is intended for Ephemeral nodes.
-func (hsdb *HSDatabase) DeleteEphemeralNode(
-	nodeID types.NodeID,
-) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
-		err := tx.Unscoped().Delete(&types.Node{}, nodeID).Error
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
 }
 
 // RegisterNodeForTest is used only for testing purposes to register a node directly in the database.
@@ -376,8 +366,8 @@ func NodeSetMachineKey(
 
 // EphemeralGarbageCollector is a garbage collector that will delete nodes after
 // a certain amount of time.
-// It is used to delete ephemeral nodes ([types.Node.IsEphemeral]) that have disconnected and should be
-// cleaned up.
+// It is used to delete ephemeral nodes ([types.Node.IsEphemeral]) that have disconnected, or never
+// connected, and should be cleaned up.
 type EphemeralGarbageCollector struct {
 	mu sync.Mutex
 
@@ -387,8 +377,9 @@ type EphemeralGarbageCollector struct {
 	// was superseded by a Cancel or reschedule can be recognised and dropped.
 	gen uint64
 
-	deleteCh chan pendingDeletion
-	cancelCh chan struct{}
+	deleteCh  chan pendingDeletion
+	cancelCh  chan struct{}
+	closeOnce sync.Once
 }
 
 // ephemeralTimer pairs a node's pending-deletion timer with a done channel
@@ -420,7 +411,7 @@ func NewEphemeralGarbageCollector(deleteFunc func(types.NodeID)) *EphemeralGarba
 	}
 }
 
-// Close stops the garbage collector.
+// Close stops the garbage collector. It is safe to call more than once.
 func (e *EphemeralGarbageCollector) Close() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -431,7 +422,7 @@ func (e *EphemeralGarbageCollector) Close() {
 	}
 
 	// Close the cancel channel to signal all goroutines to exit
-	close(e.cancelCh)
+	e.closeOnce.Do(func() { close(e.cancelCh) })
 }
 
 // Schedule schedules a node for deletion after the expiry duration.

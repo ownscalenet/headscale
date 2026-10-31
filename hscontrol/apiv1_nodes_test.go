@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/juanfont/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -200,6 +201,15 @@ func TestAPIV1NodeExpire(t *testing.T) {
 		assert.NotNil(t, got.Node["expiry"])
 	})
 
+	t.Run("huma refuses an unencodable expiry", func(t *testing.T) {
+		h := newAPIV1Harness(t)
+		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
+
+		res := h.callHuma(http.MethodPost, "/api/v1/node/1/expire",
+			[]byte(`{"expiry":"9999-12-31T23:59:59-23:59"}`))
+		assertStatus(t, res, http.StatusBadRequest)
+	})
+
 	t.Run("not found parity", func(t *testing.T) {
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/99999/expire", nil)
@@ -307,6 +317,35 @@ func TestAPIV1NodeSetApprovedRoutes(t *testing.T) {
 			[]byte(`{"routes":[]}`))
 		assertStatus(t, res, http.StatusBadRequest)
 	})
+
+	// The admin's v2 route calls on routers announcing the tailnet's own
+	// addresses, replayed against v1: the same routes accepted or refused.
+	// Test data source: policy/v2/testdata/routes_results/routes-t4-admin.hujson.
+	t.Run("saas compat", func(t *testing.T) {
+		c := readRoutesCapture(t, "routes-t4-admin")
+		h := newAPIV1Harness(t)
+		devices := seedCaptureRouters(t, h.app, c)
+
+		replayRouteCalls(t, c, "v1-", func(a testcapture.Action, alias string) routeCall {
+			target := "/api/v1/node/" + devices[alias]
+			if a.Method == http.MethodPost {
+				target += "/approve_routes"
+			}
+
+			res := h.callHuma(a.Method, target, a.Body)
+
+			var body struct {
+				Node struct {
+					Available []string `json:"availableRoutes"`
+					Approved  []string `json:"approvedRoutes"`
+				} `json:"node"`
+				Detail string `json:"detail"`
+			}
+			require.NoErrorf(t, json.Unmarshal(res.body, &body), "body: %s", res.body)
+
+			return routeCall{res.status, body.Node.Available, body.Node.Approved, body.Detail}
+		})
+	})
 }
 
 func TestAPIV1NodeRegister(t *testing.T) {
@@ -325,7 +364,7 @@ func TestAPIV1NodeRegister(t *testing.T) {
 				MachineKey: mk.Public(),
 				Hostname:   "registered-node",
 			}
-			app.state.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(regData))
+			require.NoError(t, app.state.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(regData)))
 		}
 
 		assertParityIsolated(t, seed, http.MethodPost,
@@ -413,4 +452,22 @@ func TestAPIV1NodeDebugCreate(t *testing.T) {
 		assert.Equal(t, "0001-01-01T00:00:00Z", got.Node["expiry"])
 		assert.Equal(t, "0001-01-01T00:00:00Z", got.Node["lastSeen"])
 	})
+}
+
+func TestAPIV1NodeDebugCreateAdmissionFailure(t *testing.T) {
+	app := createTestApp(t, func(cfg *types.Config) {
+		cfg.Tuning.RegisterCacheMaxEntries = 1
+	})
+	defer func() { require.NoError(t, app.state.Close()) }()
+
+	app.state.CreateUserForTest("alice")
+	require.NoError(t, app.state.SetAuthCacheEntry(types.MustAuthID(), types.NewAuthRequest()))
+
+	id := types.MustAuthID()
+	body := []byte(`{"user":"alice","key":"` + id.String() + `","name":"node","routes":[]}`)
+	res := callHandler(newHumaTestHandler(app), http.MethodPost, "/api/v1/debug/node", body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status)
+
+	_, ok := app.state.GetAuthCacheEntry(id)
+	require.False(t, ok)
 }
