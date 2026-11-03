@@ -167,14 +167,6 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 			return
 		}
 
-		// Re-registering with a permanent key cancels nothing, and the poll
-		// path only cancels for ephemeral nodes, so the old timer still fires.
-		if !node.IsEphemeral() {
-			log.Debug().Caller().EmbedObject(node).Msg("node is no longer ephemeral, skipping garbage collection")
-
-			return
-		}
-
 		// Schedule and Cancel run outside the session transition, so a
 		// disconnecting session can arm a timer after a reconnect already
 		// cancelled it. The session count is authoritative; a stale timer
@@ -185,6 +177,15 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 		// delete-if-idle in State if that edge matters.
 		if node.ActiveSessions() > 0 {
 			log.Debug().Caller().EmbedObject(node).Msg("ephemeral node has a live session, skipping garbage collection")
+
+			return
+		}
+
+		// A user claiming a tagged node can clear its ephemeral flag after
+		// the timer is armed.
+		if !node.IsEphemeral() {
+			log.Debug().Caller().EmbedObject(node).
+				Msg("node is no longer ephemeral, skipping garbage collection")
 
 			return
 		}
@@ -440,6 +441,7 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 			}
 
 			h.cfg.SetExtraRecords(records)
+			h.state.WarnNodesHoldingExtraRecords()
 
 			h.Change(change.ExtraRecords())
 
@@ -659,6 +661,9 @@ func (h *Headscale) Serve(ctx context.Context) error {
 
 		go h.extraRecordMan.Run()
 	}
+
+	// Covers the records from the config too.
+	h.state.WarnNodesHoldingExtraRecords()
 
 	// Start all scheduled tasks, e.g. expiring nodes, derp updates and
 	// records updates
@@ -1248,8 +1253,8 @@ func (z *zerologRequestLogger) NewLogEntry(
 	r *http.Request,
 ) middleware.LogEntry {
 	return &zerologLogEntry{
-		method: r.Method,
-		path:   r.URL.Path,
+		method: clipForLog(r.Method),
+		path:   clipForLog(r.URL.Path),
 		proto:  r.Proto,
 		remote: r.RemoteAddr,
 	}

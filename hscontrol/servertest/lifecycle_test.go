@@ -177,13 +177,14 @@ func TestNodeExpiryPreservesControlConnection(t *testing.T) {
 				assert.Equal(c, 1, current.ActiveSessions())
 				assert.Equal(c, epoch, current.SessionEpoch())
 				assert.True(c, h.Server.App.MapBatcher().IsConnected(id))
-				assert.True(c, client.Netmap().SelfNode.Expired())
+				assert.True(c, client.Netmap().SelfNode.KeyExpiry().Before(time.Now()))
 				assert.False(c, client.Netmap().SelfNode.Online().Get())
 
+				// Peers still see the connected node online, as on Tailscale SaaS.
 				peer, found := observer.PeerByName(client.Name)
 				if assert.True(c, found) {
 					assert.True(c, peer.Expired())
-					assert.False(c, peer.Online().Get())
+					assert.True(c, peer.Online().Get())
 				}
 			}, 5*time.Second, 10*time.Millisecond, "expiry must take the node offline without ending its control session")
 
@@ -220,7 +221,7 @@ func TestNodeExpiryPreservesControlConnection(t *testing.T) {
 				assert.Equal(c, epoch, current.SessionEpoch())
 				assert.Equal(c, nodeKey, current.NodeKey())
 				assert.Equal(c, 1, current.ActiveSessions())
-				assert.False(c, client.Netmap().SelfNode.Expired())
+				assert.True(c, client.Netmap().SelfNode.KeyExpiry().IsZero())
 				assert.True(c, client.Netmap().SelfNode.Online().Get())
 
 				peer, found := observer.PeerByName(client.Name)
@@ -460,6 +461,160 @@ func TestLoginProfilesAndRestart(t *testing.T) {
 			assert.NotEqual(c, before.DiscoKey(), after.DiscoKey(), "a restart brings a new disco key")
 		}
 	}, 10*time.Second, 50*time.Millisecond)
+}
+
+// TestPathsDiscoAndExpiryHelpers pins the shapes of the path, disco and
+// expiry helpers: reported endpoints and home DERP reach a peer and survive a
+// restart, a disco rotation reaches the peer too, an expired node's rotation
+// leaves a login waiting while it keeps polling, and a client's own expiry
+// request is answered.
+func TestPathsDiscoAndExpiryHelpers(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "owner")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	ep := tailcfg.Endpoint{Addr: netip.MustParseAddrPort("192.0.2.1:41641"), Type: tailcfg.EndpointExplicitConf}
+	hi := &tailcfg.Hostinfo{
+		BackendLogID: "servertest-subject",
+		Hostname:     "subject",
+		NetInfo:      &tailcfg.NetInfo{PreferredDERP: 1},
+	}
+
+	subject := servertest.NewClient(t, srv, "subject",
+		servertest.WithUser(user), servertest.WithHostinfo(hi), servertest.WithEndpoints(ep))
+	viewer := servertest.NewClient(t, srv, "viewer", servertest.WithUser(user))
+
+	id := findNodeID(t, srv, "subject")
+	peerOf := func(nm *netmap.NetworkMap) (tailcfg.NodeView, bool) {
+		for _, p := range nm.Peers {
+			if p.ID() == id.NodeID() {
+				return p, true
+			}
+		}
+
+		return tailcfg.NodeView{}, false
+	}
+
+	viewer.WaitForCondition(t, "subject's paths", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+		p, ok := peerOf(nm)
+		return ok && p.HomeDERP() == 1 && p.Endpoints().Len() == 1
+	})
+
+	// A restarted tailscaled no longer holds the key it joined with, so
+	// later logins carry none.
+	require.NoError(t, subject.Restart(ctx, hi))
+
+	before, _ := peerOf(viewer.Netmap())
+
+	require.NoError(t, subject.RotateDisco(ctx))
+	viewer.WaitForCondition(t, "subject's new disco key", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+		p, ok := peerOf(nm)
+		return ok && p.DiscoKey() != before.DiscoKey()
+	})
+
+	soon := time.Now().Add(time.Hour)
+
+	err := subject.SetExpirySooner(ctx, soon)
+	if err != nil {
+		attempts := subject.RegisterAttempts()
+		assert.Equal(t, err.Error(), attempts[len(attempts)-1].Err, "a refusal is the last attempt")
+	} else {
+		node, ok := srv.State().GetNodeByID(id)
+		require.True(t, ok)
+		assert.WithinDuration(t, soon, node.Expiry().Get(), time.Second, "the requested expiry is stored")
+	}
+
+	now := time.Now()
+	_, c, err := srv.State().SetNodeExpiry(id, &now)
+	require.NoError(t, err)
+	srv.App.Change(c)
+	subject.WaitForCondition(t, "own key expired", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfKeyExpiry().Before(time.Now())
+	})
+
+	attempts := len(subject.RegisterAttempts())
+	updates := subject.UpdateCount()
+
+	require.NoError(t, subject.RotateDisco(ctx))
+
+	got := subject.RegisterAttempts()[attempts:]
+	require.NotEmpty(t, got)
+	assert.NotEmpty(t, got[0].AuthURL, "an expired node is asked to log in")
+	assert.NotEmpty(t, got[0].OldNodeKey, "with a new node key")
+
+	require.Eventually(t, func() bool { return subject.UpdateCount() > updates }, 10*time.Second, 50*time.Millisecond,
+		"the poll goes on while the login waits")
+}
+
+// TestFramesCountResponsesWithoutControlTime checks that Frames counts the
+// responses headscale sends without a ControlTime: a removal ahead of its
+// batch, and the expiry a deleted node's new stream opens with. A client
+// that rebuilds its netmap on every response counts one frame per rebuild.
+func TestFramesCountResponsesWithoutControlTime(t *testing.T) {
+	t.Parallel()
+
+	requireFramePerRebuild := func(t *testing.T, cl *servertest.TestClient) {
+		t.Helper()
+
+		assert.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Equal(c, cl.UpdateCount(), cl.Frames())
+		}, 10*time.Second, 50*time.Millisecond)
+	}
+
+	t.Run("removal", func(t *testing.T) {
+		t.Parallel()
+
+		srv := servertest.NewServer(t)
+		user1 := srv.CreateUser(t, "frames-user1")
+		user2 := srv.CreateUser(t, "frames-user2")
+		viewer := servertest.NewClient(t, srv, "frames-viewer", servertest.WithUser(user1))
+		servertest.NewClient(t, srv, "frames-peer", servertest.WithUser(user2))
+		viewer.WaitForPeers(t, 1, 15*time.Second)
+
+		changed, err := srv.State().SetPolicy([]byte(`{
+			"acls": [
+				{"action": "accept", "src": ["frames-user1@"], "dst": ["frames-user1@:*"]},
+				{"action": "accept", "src": ["frames-user2@"], "dst": ["frames-user2@:*"]}
+			]
+		}`))
+		require.NoError(t, err)
+		require.True(t, changed)
+
+		changes, err := srv.State().ReloadPolicy()
+		require.NoError(t, err)
+		srv.App.Change(changes...)
+
+		viewer.WaitForPeerCount(t, 0, 15*time.Second)
+		requireFramePerRebuild(t, viewer)
+	})
+
+	t.Run("deleted-node-expiry", func(t *testing.T) {
+		t.Parallel()
+
+		srv := servertest.NewServer(t)
+		cl := servertest.NewClient(t, srv, "frames-deleted")
+		cl.WaitForCondition(t, "initial netmap", 15*time.Second,
+			func(nm *netmap.NetworkMap) bool { return nm != nil })
+
+		node, ok := srv.State().GetNodeByID(findNodeID(t, srv, "frames-deleted"))
+		require.True(t, ok)
+
+		changes, err := srv.State().DeleteNode(node)
+		require.NoError(t, err)
+		srv.App.Change(changes...)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		require.NoError(t, cl.RestartPoll(ctx))
+		cl.WaitForCondition(t, "expired self", 15*time.Second,
+			func(nm *netmap.NetworkMap) bool { return nm != nil && nm.SelfNode.Expired() })
+		requireFramePerRebuild(t, cl)
+	})
 }
 
 func TestNodeExpiryRouteFailover(t *testing.T) {
